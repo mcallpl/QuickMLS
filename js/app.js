@@ -1,5 +1,6 @@
 /* ============================================================
    QuickMLS — Main Application JS
+   Hero property with full detail + comp swap
    ============================================================ */
 
 (function() {
@@ -10,31 +11,14 @@
     const clearBtn     = document.getElementById('clearBtn');
     const searchBtn    = document.getElementById('searchBtn');
     const loader       = document.getElementById('loader');
-    const results      = document.getElementById('results');
+    const resultsEl    = document.getElementById('results');
     const noResults    = document.getElementById('noResults');
 
-    // Quick sheet elements
-    const qsPhoto     = document.getElementById('qsPhoto');
-    const qsPhotoNav  = document.getElementById('qsPhotoNav');
-    const photoPrev   = document.getElementById('photoPrev');
-    const photoNext   = document.getElementById('photoNext');
-    const photoCounter = document.getElementById('photoCounter');
-    const qsStatus    = document.getElementById('qsStatus');
-    const qsAddress   = document.getElementById('qsAddress');
-    const qsCityLine  = document.getElementById('qsCityLine');
-    const qsPrice     = document.getElementById('qsPrice');
-    const qsPriceSqft = document.getElementById('qsPricePerSqft');
-    const qsBeds      = document.getElementById('qsBeds');
-    const qsBaths     = document.getElementById('qsBaths');
-    const qsSqft      = document.getElementById('qsSqft');
-    const qsYear      = document.getElementById('qsYear');
-    const qsLot       = document.getElementById('qsLot');
-    const qsGarage    = document.getElementById('qsGarage');
-    const qsExtras    = document.getElementById('qsExtras');
-
     // State
-    let currentPhotos = [];
-    let currentPhotoIdx = 0;
+    let appData   = null;   // full API response
+    let heroData  = null;   // current hero property
+    let compsData = [];     // current comps list (includes the previous hero when swapped)
+    let carouselIdx = 0;
     let map = null;
     let markers = [];
 
@@ -51,383 +35,430 @@
     // ── Search triggers ──
     searchBtn.addEventListener('click', doSearch);
     addressInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            // Delay slightly to let Google Places autocomplete finish
-            setTimeout(doSearch, 150);
-        }
+        if (e.key === 'Enter') setTimeout(doSearch, 150);
     });
+
+    // ── Carousel arrows ──
+    document.getElementById('carouselLeft').addEventListener('click', function() { moveCarousel(-1); });
+    document.getElementById('carouselRight').addEventListener('click', function() { moveCarousel(1); });
 
     // ── Main search ──
     function doSearch() {
-        const addr = addressInput.value.trim();
+        var addr = addressInput.value.trim();
         if (!addr) return;
 
         showLoader();
         hideResults();
 
-        const form = new FormData();
+        var form = new FormData();
         form.append('full_address', addr);
 
         fetch('api/search.php', { method: 'POST', body: form })
-            .then(r => r.json())
-            .then(data => {
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
                 hideLoader();
-                if (!data.success) {
-                    showNoResults(data.error || 'Search failed.');
+                if (!data.success) { showNoResults(data.error || 'Search failed.'); return; }
+
+                appData = data;
+
+                // Pick the best hero: subject if found, otherwise first comp
+                if (data.subject) {
+                    heroData = data.subject;
+                    compsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
+                } else if (data.comps && data.comps.length > 0) {
+                    heroData = data.comps[0];
+                    compsData = data.comps.slice(1);
+                } else {
+                    showNoResults('No MLS listings found for this address.');
                     return;
                 }
-                if (!data.subject && data.comps.length === 0) {
-                    showNoResults('No MLS listings found for this address. Try a different address or check the spelling.');
-                    return;
-                }
-                renderResults(data);
+
+                renderAll();
             })
-            .catch(err => {
+            .catch(function(err) {
                 hideLoader();
                 showNoResults('Network error: ' + err.message);
             });
     }
 
-    // ── Render all results ──
-    function renderResults(data) {
-        results.classList.remove('hidden');
+    // ── Render everything ──
+    function renderAll() {
+        resultsEl.classList.remove('hidden');
         noResults.classList.add('hidden');
-
-        const subj = data.subject;
-        if (subj) {
-            renderQuickSheet(subj);
-            renderAgentInfo(subj);
-            renderRemarks(subj);
-        } else {
-            // No subject found — show address from geocode
-            document.getElementById('quickSheet').style.display = 'none';
-            document.getElementById('agentSection').classList.add('hidden');
-            document.getElementById('remarksSection').classList.add('hidden');
-        }
-
-        renderMap(data.geocoded, subj, data.comps);
-        renderCompCards(data.comps);
-        document.getElementById('compCount').textContent = '(' + data.comps.length + ' properties)';
+        renderHero(heroData);
+        renderMap(appData.geocoded, heroData, compsData);
+        renderCompCards(compsData);
+        document.getElementById('compCount').textContent = '(' + compsData.length + ' properties)';
     }
 
-    // ── Quick Sheet ──
-    function renderQuickSheet(p) {
-        document.getElementById('quickSheet').style.display = '';
+    // ═══════════════════════════════════════════════════════════
+    //  HERO — Full property detail
+    // ═══════════════════════════════════════════════════════════
 
-        // Photos
-        currentPhotos = p._photos || [];
-        currentPhotoIdx = 0;
-        if (currentPhotos.length > 0) {
-            qsPhoto.style.backgroundImage = 'url(' + currentPhotos[0] + ')';
-            if (currentPhotos.length > 1) {
-                qsPhotoNav.classList.remove('hidden');
-                updatePhotoCounter();
-            } else {
-                qsPhotoNav.classList.add('hidden');
-            }
+    function renderHero(p) {
+        // ── Photo Carousel ──
+        var photos = p._photos || [];
+        var carousel = document.getElementById('heroCarousel');
+        carousel.innerHTML = '';
+        carouselIdx = 0;
+
+        if (photos.length > 0) {
+            photos.forEach(function(url, i) {
+                var slide = document.createElement('div');
+                slide.className = 'carousel-slide' + (i === 0 ? ' active' : '');
+                slide.style.backgroundImage = 'url(' + url + ')';
+                carousel.appendChild(slide);
+            });
+            updateCarouselCounter(photos.length);
+            document.getElementById('carouselLeft').classList.toggle('hidden', photos.length < 2);
+            document.getElementById('carouselRight').classList.toggle('hidden', photos.length < 2);
         } else {
-            qsPhoto.style.backgroundImage = 'none';
-            qsPhoto.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:48px;">&#127968;</div>';
-            qsPhotoNav.classList.add('hidden');
+            carousel.innerHTML = '<div class="carousel-slide active carousel-empty">&#127968;<br><span>No Photos Available</span></div>';
+            document.getElementById('carouselLeft').classList.add('hidden');
+            document.getElementById('carouselRight').classList.add('hidden');
+            document.getElementById('carouselCounter').textContent = '';
         }
 
-        // Status badge
-        const status = p.StandardStatus || 'Unknown';
-        qsStatus.textContent = formatStatus(status);
-        qsStatus.className = 'qs-status-badge ' + statusClass(status);
+        // ── Status Badge ──
+        var status = p.StandardStatus || 'Unknown';
+        var badge = document.getElementById('heroStatusBadge');
+        badge.textContent = formatStatus(status);
+        badge.className = 'hero-status-badge ' + statusClass(status);
 
-        // Address
-        const street = [p.StreetNumber, p.StreetDirPrefix, p.StreetName, p.StreetSuffix, p.StreetDirSuffix]
-            .filter(Boolean).join(' ');
-        const unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
-        qsAddress.textContent = street + unit;
-        qsCityLine.textContent = [p.City, p.StateOrProvince, p.PostalCode].filter(Boolean).join(', ');
+        // ── Address + Price ──
+        var street = [p.StreetNumber, p.StreetDirPrefix, p.StreetName, p.StreetSuffix, p.StreetDirSuffix].filter(Boolean).join(' ');
+        var unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
+        document.getElementById('heroAddress').textContent = street + unit;
+        document.getElementById('heroCityLine').textContent = [p.City, p.StateOrProvince, p.PostalCode, p.CountyOrParish ? p.CountyOrParish + ' County' : ''].filter(Boolean).join(', ');
 
-        // Price
-        const price = p.ClosePrice || p.ListPrice;
-        qsPrice.textContent = price ? '$' + Number(price).toLocaleString() : '—';
+        var price = p.ClosePrice || p.ListPrice;
+        document.getElementById('heroPrice').textContent = price ? '$' + num(price) : '—';
         if (price && p.LivingArea) {
-            qsPriceSqft.textContent = '$' + Math.round(price / p.LivingArea).toLocaleString() + '/sq ft';
+            document.getElementById('heroPriceSqft').textContent = '$' + num(Math.round(price / p.LivingArea)) + '/sq ft';
         } else {
-            qsPriceSqft.textContent = '';
+            document.getElementById('heroPriceSqft').textContent = '';
         }
 
-        // Stats
-        qsBeds.textContent  = p.BedroomsTotal ?? '—';
-        qsBaths.textContent = p.BathroomsTotalInteger ?? '—';
-        qsSqft.textContent  = p.LivingArea ? Number(p.LivingArea).toLocaleString() : '—';
-        qsYear.textContent  = p.YearBuilt ?? '—';
-        qsGarage.textContent = p.GarageSpaces ?? '—';
+        // ── Key Stats ──
+        setText('heroBeds', p.BedroomsTotal);
+        setText('heroBaths', p.BathroomsTotalInteger);
+        setText('heroSqft', p.LivingArea ? num(p.LivingArea) : null);
+        setText('heroYear', p.YearBuilt);
+        setText('heroGarage', p.GarageSpaces);
+        setText('heroStories', p.StoriesTotal);
+        setText('heroDom', p.DaysOnMarket);
 
         // Lot
-        if (p.LotSizeAcres && p.LotSizeAcres > 0) {
-            qsLot.textContent = p.LotSizeAcres >= 1
-                ? p.LotSizeAcres.toFixed(2) + ' ac'
-                : Math.round(p.LotSizeAcres * 43560).toLocaleString() + ' sf';
+        var lotText = '—';
+        if (p.LotSizeAcres && p.LotSizeAcres > 0 && p.LotSizeAcres < 100) {
+            lotText = p.LotSizeAcres >= 1 ? p.LotSizeAcres.toFixed(2) + ' ac' : num(Math.round(p.LotSizeAcres * 43560)) + ' sf';
         } else if (p.LotSizeSquareFeet) {
-            qsLot.textContent = Number(p.LotSizeSquareFeet).toLocaleString() + ' sf';
+            lotText = num(p.LotSizeSquareFeet) + ' sf';
+        }
+        document.getElementById('heroLot').textContent = lotText;
+
+        // ── Tags ──
+        var tags = [];
+        if (p.PropertyType) tags.push(p.PropertyType);
+        if (p.PropertySubType) tags.push(p.PropertySubType);
+        if (p.ArchitecturalStyle) tags.push(arr(p.ArchitecturalStyle));
+        if (p.PoolPrivateYN === true || p.PoolPrivateYN === 'Yes') tags.push('Private Pool');
+        if (p.View) tags.push('View: ' + arr(p.View));
+        if (p.DirectionFaces) tags.push('Faces ' + p.DirectionFaces);
+        if (p.AssociationFee) tags.push('HOA $' + num(p.AssociationFee) + '/' + (p.AssociationFeeFrequency || 'mo'));
+        if (p.TaxAnnualAmount) tags.push('Tax $' + num(p.TaxAnnualAmount) + '/yr');
+        if (p.ListingId) tags.push('MLS# ' + p.ListingId);
+
+        document.getElementById('heroTags').innerHTML = tags.map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('');
+
+        // ── Agent Cards ──
+        var agentsHtml = '';
+        agentsHtml += agentCardHtml('Listing Agent', p.ListAgentFullName, p.ListOfficeName, p.ListAgentDirectPhone, p.ListAgentEmail, p.ListOfficePhone);
+        agentsHtml += agentCardHtml('Buyer Agent', p.BuyerAgentFullName, p.BuyerOfficeName, p.BuyerAgentDirectPhone, p.BuyerAgentEmail, p.BuyerOfficePhone);
+        agentsHtml += agentCardHtml('Co-List Agent', p.CoListAgentFullName, null, p.CoListAgentDirectPhone, p.CoListAgentEmail);
+        agentsHtml += agentCardHtml('Showing Contact', p.ShowingContactName, p.ShowingContactType, p.ShowingContactPhone);
+
+        document.getElementById('heroAgents').innerHTML = agentsHtml;
+
+        // ── Property Details Grid ──
+        var details = [];
+        addDetail(details, 'Bedrooms', p.BedroomsTotal);
+        addDetail(details, 'Bathrooms (Full)', p.BathroomsFull);
+        addDetail(details, 'Bathrooms (Half)', p.BathroomsHalf);
+        addDetail(details, 'Living Area', p.LivingArea ? num(p.LivingArea) + ' sq ft' : null);
+        addDetail(details, 'Building Area', p.BuildingAreaTotal ? num(p.BuildingAreaTotal) + ' sq ft' : null);
+        addDetail(details, 'Lot Size', lotText !== '—' ? lotText : null);
+        addDetail(details, 'Year Built', p.YearBuilt);
+        addDetail(details, 'Stories', p.StoriesTotal);
+        addDetail(details, 'Garage Spaces', p.GarageSpaces);
+        addDetail(details, 'Construction', arr(p.ConstructionMaterials));
+        addDetail(details, 'Foundation', arr(p.FoundationDetails));
+        addDetail(details, 'Roof', arr(p.Roof));
+        addDetail(details, 'Flooring', arr(p.Flooring));
+        addDetail(details, 'Heating', arr(p.Heating));
+        addDetail(details, 'Cooling', arr(p.Cooling));
+        addDetail(details, 'Appliances', arr(p.Appliances));
+        addDetail(details, 'Interior Features', arr(p.InteriorFeatures));
+        addDetail(details, 'Exterior Features', arr(p.ExteriorFeatures));
+        addDetail(details, 'Patio/Porch', arr(p.PatioAndPorchFeatures));
+        addDetail(details, 'Parking', arr(p.ParkingFeatures));
+        addDetail(details, 'Laundry', arr(p.LaundryFeatures));
+        addDetail(details, 'Fireplace', arr(p.FireplaceFeatures));
+        addDetail(details, 'Fencing', arr(p.Fencing));
+        addDetail(details, 'Security', arr(p.SecurityFeatures));
+        addDetail(details, 'Windows', arr(p.WindowFeatures));
+        addDetail(details, 'Water', arr(p.WaterSource));
+        addDetail(details, 'Sewer', arr(p.Sewer));
+        addDetail(details, 'Electric', arr(p.Electric));
+        addDetail(details, 'Common Walls', arr(p.CommonWalls));
+        addDetail(details, 'Direction Faces', p.DirectionFaces);
+        addDetail(details, 'View', arr(p.View));
+        addDetail(details, 'Original List Price', p.OriginalListPrice ? '$' + num(p.OriginalListPrice) : null);
+        addDetail(details, 'List Price', p.ListPrice ? '$' + num(p.ListPrice) : null);
+        addDetail(details, 'Close Price', p.ClosePrice ? '$' + num(p.ClosePrice) : null);
+        addDetail(details, 'Close Date', p.CloseDate);
+        addDetail(details, 'Tax Assessed Value', p.TaxAssessedValue ? '$' + num(p.TaxAssessedValue) : null);
+        addDetail(details, 'Annual Tax', p.TaxAnnualAmount ? '$' + num(p.TaxAnnualAmount) : null);
+        addDetail(details, 'HOA Fee', p.AssociationFee ? '$' + num(p.AssociationFee) + '/' + (p.AssociationFeeFrequency || 'mo') : null);
+
+        document.getElementById('heroDetailsGrid').innerHTML = details.length > 0
+            ? '<h4>Property Details</h4><div class="details-grid">' + details.join('') + '</div>'
+            : '';
+
+        // ── Public Remarks ──
+        var pubSection = document.getElementById('heroPublicRemarks');
+        if (p.PublicRemarks) {
+            document.getElementById('heroPublicRemarksText').textContent = p.PublicRemarks;
+            pubSection.classList.remove('hidden');
         } else {
-            qsLot.textContent = '—';
+            pubSection.classList.add('hidden');
         }
 
-        // Extras
-        const extras = [];
-        if (p.PropertyType) extras.push(p.PropertyType);
-        if (p.PropertySubType) extras.push(p.PropertySubType);
-        if (p.StoriesTotal) extras.push(p.StoriesTotal + ' stories');
-        if (p.PoolPrivateYN === true || p.PoolPrivateYN === 'Yes') extras.push('Pool');
-        if (p.AssociationFee) extras.push('HOA $' + p.AssociationFee + '/' + (p.AssociationFeeFrequency || 'mo'));
-        if (p.DaysOnMarket != null) extras.push(p.DaysOnMarket + ' DOM');
-        if (p.TaxAnnualAmount) extras.push('Tax $' + Number(p.TaxAnnualAmount).toLocaleString() + '/yr');
-        if (p.ListingId) extras.push('MLS# ' + p.ListingId);
+        // ── Private Remarks ──
+        var privSection = document.getElementById('heroPrivateRemarks');
+        if (p.PrivateRemarks) {
+            document.getElementById('heroPrivateRemarksText').textContent = p.PrivateRemarks;
+            privSection.classList.remove('hidden');
+        } else {
+            privSection.classList.add('hidden');
+        }
 
-        qsExtras.innerHTML = extras.map(e => '<span class="qs-extra-tag">' + escHtml(e) + '</span>').join('');
+        // ── Showing Instructions ──
+        var metaHtml = '';
+        if (p.ShowingInstructions) {
+            metaHtml += '<div class="meta-row"><strong>Showing Instructions:</strong> ' + esc(p.ShowingInstructions) + '</div>';
+        }
+        if (p.ListingContractDate) {
+            metaHtml += '<div class="meta-row"><strong>Listed:</strong> ' + esc(p.ListingContractDate) + '</div>';
+        }
+        if (p.CumulativeDaysOnMarket != null) {
+            metaHtml += '<div class="meta-row"><strong>Cumulative DOM:</strong> ' + p.CumulativeDaysOnMarket + '</div>';
+        }
+        if (p.ModificationTimestamp) {
+            metaHtml += '<div class="meta-row"><strong>Last Updated:</strong> ' + new Date(p.ModificationTimestamp).toLocaleDateString() + '</div>';
+        }
+        document.getElementById('heroMeta').innerHTML = metaHtml;
+
+        // Scroll to top of hero
+        document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // ── Photo navigation ──
-    photoPrev.addEventListener('click', function() {
-        if (currentPhotos.length < 2) return;
-        currentPhotoIdx = (currentPhotoIdx - 1 + currentPhotos.length) % currentPhotos.length;
-        qsPhoto.style.backgroundImage = 'url(' + currentPhotos[currentPhotoIdx] + ')';
-        updatePhotoCounter();
-    });
-    photoNext.addEventListener('click', function() {
-        if (currentPhotos.length < 2) return;
-        currentPhotoIdx = (currentPhotoIdx + 1) % currentPhotos.length;
-        qsPhoto.style.backgroundImage = 'url(' + currentPhotos[currentPhotoIdx] + ')';
-        updatePhotoCounter();
-    });
-    function updatePhotoCounter() {
-        photoCounter.textContent = (currentPhotoIdx + 1) + ' / ' + currentPhotos.length;
-    }
-
-    // ── Agent Info ──
-    function renderAgentInfo(p) {
-        const section = document.getElementById('agentSection');
-        const container = document.getElementById('agentCards');
-        container.innerHTML = '';
-        let hasAgent = false;
-
-        // Listing Agent
-        if (p.ListAgentFullName) {
-            hasAgent = true;
-            container.innerHTML += agentCard('Listing Agent', p.ListAgentFullName, p.ListOfficeName, p.ListAgentDirectPhone, p.ListAgentEmail);
-        }
-
-        // Buyer Agent
-        if (p.BuyerAgentFullName) {
-            hasAgent = true;
-            container.innerHTML += agentCard('Buyer Agent', p.BuyerAgentFullName, p.BuyerOfficeName, p.BuyerAgentDirectPhone, p.BuyerAgentEmail);
-        }
-
-        // Co-List Agent
-        if (p.CoListAgentFullName) {
-            hasAgent = true;
-            container.innerHTML += agentCard('Co-List Agent', p.CoListAgentFullName, '', p.CoListAgentDirectPhone, p.CoListAgentEmail);
-        }
-
-        section.classList.toggle('hidden', !hasAgent);
-    }
-
-    function agentCard(role, name, office, phone, email) {
-        let html = '<div class="agent-card">';
-        html += '<div class="agent-card-role">' + escHtml(role) + '</div>';
-        html += '<div class="agent-card-name">' + escHtml(name) + '</div>';
-        if (office) html += '<div class="agent-card-office">' + escHtml(office) + '</div>';
-        html += '<div class="agent-card-contact">';
+    // ── Agent card HTML builder ──
+    function agentCardHtml(role, name, office, phone, email, officePhone) {
+        if (!name) return '';
+        var h = '<div class="agent-card">';
+        h += '<div class="agent-role">' + esc(role) + '</div>';
+        h += '<div class="agent-name">' + esc(name) + '</div>';
+        if (office) h += '<div class="agent-office">' + esc(office) + '</div>';
+        h += '<div class="agent-contacts">';
         if (phone) {
-            const cleanPhone = phone.replace(/\D/g, '');
-            html += '<div class="agent-contact-row"><span class="icon">&#128222;</span><a href="tel:' + cleanPhone + '">' + escHtml(phone) + '</a></div>';
+            var clean = phone.replace(/\D/g, '');
+            h += '<a href="tel:' + clean + '" class="agent-contact-link">&#128222; ' + esc(phone) + '</a>';
         }
         if (email) {
-            html += '<div class="agent-contact-row"><span class="icon">&#9993;</span><a href="mailto:' + escHtml(email) + '">' + escHtml(email) + '</a></div>';
+            h += '<a href="mailto:' + esc(email) + '" class="agent-contact-link">&#9993; ' + esc(email) + '</a>';
+        }
+        if (officePhone && officePhone !== phone) {
+            var cleanOff = officePhone.replace(/\D/g, '');
+            h += '<a href="tel:' + cleanOff + '" class="agent-contact-link">&#127970; Office: ' + esc(officePhone) + '</a>';
         }
         if (!phone && !email) {
-            html += '<div class="agent-contact-row" style="color:var(--text-dim)">No contact info available</div>';
+            h += '<span class="agent-no-contact">No contact info available</span>';
         }
-        html += '</div></div>';
-        return html;
+        h += '</div></div>';
+        return h;
     }
 
-    // ── Remarks ──
-    function renderRemarks(p) {
-        const section = document.getElementById('remarksSection');
-        const text = document.getElementById('remarksText');
-        if (p.PublicRemarks) {
-            text.textContent = p.PublicRemarks;
-            section.classList.remove('hidden');
-        } else {
-            section.classList.add('hidden');
-        }
+    // ── Carousel navigation ──
+    function moveCarousel(dir) {
+        var slides = document.querySelectorAll('#heroCarousel .carousel-slide');
+        if (slides.length < 2) return;
+        slides[carouselIdx].classList.remove('active');
+        carouselIdx = (carouselIdx + dir + slides.length) % slides.length;
+        slides[carouselIdx].classList.add('active');
+        updateCarouselCounter(slides.length);
+    }
+    function updateCarouselCounter(total) {
+        document.getElementById('carouselCounter').textContent = (carouselIdx + 1) + ' / ' + total;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  COMPS — Cards + Map
+    // ═══════════════════════════════════════════════════════════
+
+    function renderCompCards(comps) {
+        var container = document.getElementById('compsList');
+        container.innerHTML = '';
+
+        comps.forEach(function(c, idx) {
+            var price = c.ClosePrice || c.ListPrice;
+            var photo = (c._photos && c._photos[0]) || '';
+            var status = c.StandardStatus || '';
+
+            var card = document.createElement('div');
+            card.className = 'comp-card';
+            card.dataset.compIdx = idx;
+
+            var html = '';
+            if (photo) {
+                html += '<div class="comp-card-img" style="background-image:url(' + escAttr(photo) + ')"></div>';
+            } else {
+                html += '<div class="comp-card-img comp-card-img-empty">&#127968;</div>';
+            }
+
+            html += '<div class="comp-card-body">';
+            html += '<div class="comp-card-status ' + statusClass(status) + '">' + formatStatus(status) + '</div>';
+            html += '<div class="comp-card-price">$' + (price ? num(price) : '—') + '</div>';
+            html += '<div class="comp-card-addr">' + esc(formatAddr(c)) + '</div>';
+
+            html += '<div class="comp-card-stats">';
+            html += '<div><span>' + (c.BedroomsTotal || '—') + '</span> bd</div>';
+            html += '<div><span>' + (c.BathroomsTotalInteger || '—') + '</span> ba</div>';
+            html += '<div><span>' + (c.LivingArea ? num(c.LivingArea) : '—') + '</span> sqft</div>';
+            html += '</div>';
+
+            if (c._distanceFt) {
+                html += '<div class="comp-card-distance">' + num(c._distanceFt) + ' ft away</div>';
+            }
+            if (c.ListAgentFullName) {
+                html += '<div class="comp-card-agent">&#128100; ' + esc(c.ListAgentFullName);
+                if (c.ListAgentDirectPhone) html += ' &middot; ' + esc(c.ListAgentDirectPhone);
+                html += '</div>';
+            }
+
+            html += '<div class="comp-card-swap">Click to view full details &#8594;</div>';
+            html += '</div>';
+
+            card.innerHTML = html;
+
+            // ── SWAP: comp becomes hero, hero becomes comp ──
+            card.addEventListener('click', function() {
+                var clickedIdx = parseInt(this.dataset.compIdx);
+                var clickedComp = compsData[clickedIdx];
+
+                // Old hero goes into comps at the position of the clicked comp
+                var oldHero = heroData;
+                // Compute distance for old hero (so it shows in comp card)
+                if (oldHero.Latitude && oldHero.Longitude && appData.geocoded) {
+                    oldHero._distance = haversine(appData.geocoded.lat, appData.geocoded.lng, oldHero.Latitude, oldHero.Longitude);
+                    oldHero._distanceFt = Math.round(oldHero._distance * 5280);
+                }
+
+                // Swap
+                heroData = clickedComp;
+                compsData[clickedIdx] = oldHero;
+
+                renderAll();
+            });
+
+            container.appendChild(card);
+        });
     }
 
     // ── Map ──
     function renderMap(geo, subject, comps) {
-        const mapEl = document.getElementById('map');
-
-        if (map) {
-            map.remove();
-            map = null;
-        }
+        var mapEl = document.getElementById('map');
+        if (map) { map.remove(); map = null; }
         markers = [];
 
         map = L.map(mapEl).setView([geo.lat, geo.lng], 16);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            attribution: '&copy; OSM &copy; CARTO',
             maxZoom: 19,
         }).addTo(map);
 
-        // 1/8 mile radius circle (≈ 201 meters)
+        // 1/8 mile radius circle
         L.circle([geo.lat, geo.lng], {
-            radius: 201,
-            color: '#58a6ff',
-            fillColor: '#58a6ff',
-            fillOpacity: 0.08,
-            weight: 1.5,
-            dashArray: '6,4',
+            radius: 201, color: '#58a6ff', fillColor: '#58a6ff',
+            fillOpacity: 0.08, weight: 1.5, dashArray: '6,4',
         }).addTo(map);
 
-        // Subject marker (larger, different color)
+        // Subject marker
         if (subject && subject.Latitude && subject.Longitude) {
-            const subjectIcon = L.divIcon({
+            var si = L.divIcon({
                 html: '<div style="width:18px;height:18px;background:#ff6b6b;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5);"></div>',
-                iconSize: [18, 18],
-                iconAnchor: [9, 9],
-                className: '',
+                iconSize: [18, 18], iconAnchor: [9, 9], className: '',
             });
-            const m = L.marker([subject.Latitude, subject.Longitude], { icon: subjectIcon }).addTo(map);
-            const price = subject.ClosePrice || subject.ListPrice;
-            m.bindPopup(
-                '<b>SUBJECT PROPERTY</b><br>' +
-                '<div class="popup-price">$' + (price ? Number(price).toLocaleString() : '—') + '</div>' +
-                '<div class="popup-addr">' + escHtml(formatAddr(subject)) + '</div>'
-            );
+            var sm = L.marker([subject.Latitude, subject.Longitude], { icon: si }).addTo(map);
+            var sp = subject.ClosePrice || subject.ListPrice;
+            sm.bindPopup('<b>CURRENT PROPERTY</b><br><div class="popup-price">$' + (sp ? num(sp) : '—') + '</div><div class="popup-addr">' + esc(formatAddr(subject)) + '</div>');
         }
 
         // Comp markers
         comps.forEach(function(c) {
             if (!c.Latitude || !c.Longitude) return;
-            // Skip if same as subject
             if (subject && c.ListingKey === subject.ListingKey) return;
 
-            const color = statusMarkerColor(c.StandardStatus);
-            const icon = L.divIcon({
+            var color = statusMarkerColor(c.StandardStatus);
+            var icon = L.divIcon({
                 html: '<div style="width:12px;height:12px;background:' + color + ';border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
-                iconSize: [12, 12],
-                iconAnchor: [6, 6],
-                className: '',
+                iconSize: [12, 12], iconAnchor: [6, 6], className: '',
             });
-
-            const m = L.marker([c.Latitude, c.Longitude], { icon: icon }).addTo(map);
-            const price = c.ClosePrice || c.ListPrice;
-            let popup = '<div class="popup-price">$' + (price ? Number(price).toLocaleString() : '—') + '</div>';
-            popup += '<div class="popup-addr">' + escHtml(formatAddr(c)) + '</div>';
-            popup += '<div style="margin-top:4px;font-size:12px;">';
-            popup += (c.BedroomsTotal || '—') + ' bd | ' + (c.BathroomsTotalInteger || '—') + ' ba | ' + (c.LivingArea ? Number(c.LivingArea).toLocaleString() + ' sqft' : '—');
-            popup += '</div>';
-            if (c._distanceFt) popup += '<div style="font-size:11px;color:#8b949e;margin-top:2px;">' + c._distanceFt.toLocaleString() + ' ft away</div>';
-            if (c.ListAgentFullName) popup += '<div style="font-size:11px;color:#58a6ff;margin-top:2px;">' + escHtml(c.ListAgentFullName) + '</div>';
+            var m = L.marker([c.Latitude, c.Longitude], { icon: icon }).addTo(map);
+            var cp = c.ClosePrice || c.ListPrice;
+            var popup = '<div class="popup-price">$' + (cp ? num(cp) : '—') + '</div>';
+            popup += '<div class="popup-addr">' + esc(formatAddr(c)) + '</div>';
+            popup += '<div style="margin-top:4px;font-size:12px;">' + (c.BedroomsTotal||'—') + ' bd | ' + (c.BathroomsTotalInteger||'—') + ' ba | ' + (c.LivingArea ? num(c.LivingArea) + ' sqft' : '—') + '</div>';
+            if (c.ListAgentFullName) popup += '<div style="font-size:11px;color:#58a6ff;margin-top:2px;">' + esc(c.ListAgentFullName) + '</div>';
             m.bindPopup(popup);
             markers.push(m);
         });
 
-        // Fit bounds
         setTimeout(function() { map.invalidateSize(); }, 100);
     }
 
-    // ── Comp Cards ──
-    function renderCompCards(comps) {
-        const container = document.getElementById('compsList');
-        container.innerHTML = '';
+    // ═══════════════════════════════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════════════════════════════
 
-        comps.forEach(function(c) {
-            const price = c.ClosePrice || c.ListPrice;
-            const photo = (c._photos && c._photos[0]) || '';
-            const status = c.StandardStatus || '';
-
-            let html = '<div class="comp-card" data-lat="' + (c.Latitude||'') + '" data-lng="' + (c.Longitude||'') + '">';
-
-            // Photo
-            if (photo) {
-                html += '<div class="comp-card-img" style="background-image:url(' + escAttr(photo) + ')"></div>';
-            } else {
-                html += '<div class="comp-card-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-dim);">&#127968;</div>';
-            }
-
-            html += '<div class="comp-card-body">';
-            html += '<div class="comp-card-status ' + statusClass(status) + '">' + formatStatus(status) + '</div>';
-            html += '<div class="comp-card-price">$' + (price ? Number(price).toLocaleString() : '—') + '</div>';
-            html += '<div class="comp-card-addr">' + escHtml(formatAddr(c)) + '</div>';
-
-            html += '<div class="comp-card-stats">';
-            html += '<div><span>' + (c.BedroomsTotal || '—') + '</span> bd</div>';
-            html += '<div><span>' + (c.BathroomsTotalInteger || '—') + '</span> ba</div>';
-            html += '<div><span>' + (c.LivingArea ? Number(c.LivingArea).toLocaleString() : '—') + '</span> sqft</div>';
-            html += '</div>';
-
-            if (c._distanceFt) {
-                html += '<div class="comp-card-distance">' + c._distanceFt.toLocaleString() + ' ft away</div>';
-            }
-            if (c.ListAgentFullName) {
-                html += '<div class="comp-card-agent">&#128100; ' + escHtml(c.ListAgentFullName);
-                if (c.ListAgentDirectPhone) html += ' &middot; ' + escHtml(c.ListAgentDirectPhone);
-                html += '</div>';
-            }
-
-            html += '</div></div>';
-            container.innerHTML += html;
-        });
-
-        // Click comp card → zoom to marker on map
-        container.querySelectorAll('.comp-card').forEach(function(card) {
-            card.addEventListener('click', function() {
-                const lat = parseFloat(this.dataset.lat);
-                const lng = parseFloat(this.dataset.lng);
-                if (lat && lng && map) {
-                    map.setView([lat, lng], 18);
-                    // Open the nearest marker's popup
-                    markers.forEach(function(m) {
-                        const pos = m.getLatLng();
-                        if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001) {
-                            m.openPopup();
-                        }
-                    });
-                }
-            });
-        });
-    }
-
-    // ── Helpers ──
     function showLoader() { loader.classList.remove('hidden'); }
     function hideLoader() { loader.classList.add('hidden'); }
-    function hideResults() {
-        results.classList.add('hidden');
-        noResults.classList.add('hidden');
-    }
-    function showNoResults(msg) {
-        document.getElementById('noResultsMsg').textContent = msg;
-        noResults.classList.remove('hidden');
-    }
+    function hideResults() { resultsEl.classList.add('hidden'); noResults.classList.add('hidden'); }
+    function showNoResults(msg) { document.getElementById('noResultsMsg').textContent = msg; noResults.classList.remove('hidden'); }
 
+    function setText(id, val) { document.getElementById(id).textContent = val != null ? val : '—'; }
+    function num(n) { return Number(n).toLocaleString(); }
     function formatAddr(p) {
-        const street = [p.StreetNumber, p.StreetName].filter(Boolean).join(' ');
-        const unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
+        var street = [p.StreetNumber, p.StreetName].filter(Boolean).join(' ');
+        var unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
         return street + unit + ', ' + [p.City, p.StateOrProvince].filter(Boolean).join(', ');
     }
 
-    function formatStatus(s) {
-        const map = {
-            'Active': 'Active',
-            'Pending': 'Pending',
-            'Closed': 'Closed',
-            'ActiveUnderContract': 'Under Contract',
-            'ComingSoon': 'Coming Soon',
-            'Canceled': 'Canceled',
-            'Expired': 'Expired',
-        };
-        return map[s] || s;
+    function arr(val) {
+        if (!val) return '';
+        if (Array.isArray(val)) return val.join(', ');
+        return String(val);
     }
 
+    function addDetail(list, label, value) {
+        if (!value && value !== 0) return;
+        list.push('<div class="detail-item"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(value)) + '</span></div>');
+    }
+
+    function formatStatus(s) {
+        var m = { 'Active':'Active','Pending':'Pending','Closed':'Closed','ActiveUnderContract':'Under Contract','ComingSoon':'Coming Soon','Canceled':'Canceled','Expired':'Expired' };
+        return m[s] || s;
+    }
     function statusClass(s) {
         if (s === 'Active' || s === 'ComingSoon') return 'active';
         if (s === 'Pending') return 'pending';
@@ -435,7 +466,6 @@
         if (s === 'ActiveUnderContract') return 'contract';
         return '';
     }
-
     function statusMarkerColor(s) {
         if (s === 'Active' || s === 'ComingSoon') return '#3fb950';
         if (s === 'Pending') return '#d29922';
@@ -444,16 +474,20 @@
         return '#8b949e';
     }
 
-    function escHtml(s) {
+    function haversine(lat1, lng1, lat2, lng2) {
+        var R = 3959, dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+        var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+    function rad(d) { return d * Math.PI / 180; }
+
+    function esc(s) {
         if (!s) return '';
         var d = document.createElement('div');
         d.textContent = s;
         return d.innerHTML;
     }
-
-    function escAttr(s) {
-        return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
+    function escAttr(s) { return (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
     // ── Google Places Autocomplete ──
     window.initPlaces = function() {
@@ -462,7 +496,6 @@
             componentRestrictions: { country: 'us' },
             fields: ['formatted_address']
         });
-
         autocomplete.addListener('place_changed', function() {
             var place = autocomplete.getPlace();
             if (place && place.formatted_address) {

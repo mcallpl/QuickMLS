@@ -51,7 +51,15 @@ $selectFields = implode(',', [
     // Type
     'PropertyType', 'PropertySubType',
     // Description
-    'PublicRemarks',
+    'PublicRemarks', 'PrivateRemarks', 'SyndicationRemarks',
+    // Features
+    'Appliances', 'InteriorFeatures', 'ExteriorFeatures',
+    'ParkingFeatures', 'LaundryFeatures', 'FireplaceFeatures',
+    'WaterSource', 'Sewer', 'Electric',
+    'FoundationDetails', 'ArchitecturalStyle', 'BuildingAreaTotal',
+    'CommonWalls', 'ConstructionMaterials', 'DirectionFaces',
+    'PatioAndPorchFeatures', 'SecurityFeatures', 'View',
+    'WindowFeatures', 'Fencing',
     // Listing Agent
     'ListAgentFullName', 'ListAgentDirectPhone', 'ListAgentEmail',
     'ListAgentMlsId', 'ListAgentKey',
@@ -64,6 +72,9 @@ $selectFields = implode(',', [
     'BuyerOfficeName', 'BuyerOfficePhone',
     // Co-List Agent
     'CoListAgentFullName', 'CoListAgentDirectPhone', 'CoListAgentEmail',
+    // Showing Agent
+    'ShowingContactName', 'ShowingContactPhone', 'ShowingContactType',
+    'ShowingInstructions',
     // HOA
     'AssociationFee', 'AssociationFeeFrequency',
     // Timing

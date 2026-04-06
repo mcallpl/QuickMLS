@@ -53,53 +53,70 @@ $v = time();
     <!-- RESULTS CONTAINER -->
     <div id="results" class="results hidden">
 
-        <!-- QUICK SHEET -->
-        <div id="quickSheet" class="quick-sheet">
-            <div class="qs-photo-wrap">
-                <div id="qsPhoto" class="qs-photo"></div>
-                <div id="qsPhotoNav" class="qs-photo-nav hidden">
-                    <button id="photoPrev" class="photo-nav-btn">&lsaquo;</button>
-                    <span id="photoCounter" class="photo-counter">1 / 1</span>
-                    <button id="photoNext" class="photo-nav-btn">&rsaquo;</button>
-                </div>
+        <!-- ═══ HERO PROPERTY — Full Detail ═══ -->
+        <div id="heroSection" class="hero-section">
+
+            <!-- Photo Carousel -->
+            <div class="hero-carousel-wrap">
+                <div id="heroCarousel" class="hero-carousel"></div>
+                <button id="carouselLeft" class="carousel-arrow carousel-left">&#8249;</button>
+                <button id="carouselRight" class="carousel-arrow carousel-right">&#8250;</button>
+                <div id="carouselCounter" class="carousel-counter">1 / 1</div>
+                <div id="heroStatusBadge" class="hero-status-badge">Active</div>
             </div>
 
-            <div class="qs-details">
-                <div id="qsStatus" class="qs-status-badge">Active</div>
-                <h2 id="qsAddress" class="qs-address"></h2>
-                <div id="qsCityLine" class="qs-city-line"></div>
-
-                <div class="qs-price-row">
-                    <div id="qsPrice" class="qs-price"></div>
-                    <div id="qsPricePerSqft" class="qs-price-sqft"></div>
+            <!-- Property Details -->
+            <div class="hero-body">
+                <div class="hero-address-row">
+                    <div>
+                        <h2 id="heroAddress" class="hero-address"></h2>
+                        <div id="heroCityLine" class="hero-city-line"></div>
+                    </div>
+                    <div class="hero-price-block">
+                        <div id="heroPrice" class="hero-price"></div>
+                        <div id="heroPriceSqft" class="hero-price-sqft"></div>
+                    </div>
                 </div>
 
-                <div class="qs-stats">
-                    <div class="qs-stat"><span id="qsBeds" class="qs-stat-val">—</span><span class="qs-stat-label">Beds</span></div>
-                    <div class="qs-stat"><span id="qsBaths" class="qs-stat-val">—</span><span class="qs-stat-label">Baths</span></div>
-                    <div class="qs-stat"><span id="qsSqft" class="qs-stat-val">—</span><span class="qs-stat-label">Sq Ft</span></div>
-                    <div class="qs-stat"><span id="qsYear" class="qs-stat-val">—</span><span class="qs-stat-label">Year Built</span></div>
-                    <div class="qs-stat"><span id="qsLot" class="qs-stat-val">—</span><span class="qs-stat-label">Lot</span></div>
-                    <div class="qs-stat"><span id="qsGarage" class="qs-stat-val">—</span><span class="qs-stat-label">Garage</span></div>
+                <!-- Key Stats Bar -->
+                <div class="hero-stats-bar">
+                    <div class="hero-stat"><span id="heroBeds">—</span><small>Beds</small></div>
+                    <div class="hero-stat"><span id="heroBaths">—</span><small>Baths</small></div>
+                    <div class="hero-stat"><span id="heroSqft">—</span><small>Sq Ft</small></div>
+                    <div class="hero-stat"><span id="heroYear">—</span><small>Year Built</small></div>
+                    <div class="hero-stat"><span id="heroLot">—</span><small>Lot</small></div>
+                    <div class="hero-stat"><span id="heroGarage">—</span><small>Garage</small></div>
+                    <div class="hero-stat"><span id="heroStories">—</span><small>Stories</small></div>
+                    <div class="hero-stat"><span id="heroDom">—</span><small>DOM</small></div>
                 </div>
 
-                <div id="qsExtras" class="qs-extras"></div>
+                <!-- Tags Row -->
+                <div id="heroTags" class="hero-tags"></div>
+
+                <!-- Agent Info — RIGHT in the hero -->
+                <div id="heroAgents" class="hero-agents"></div>
+
+                <!-- Property Details Grid -->
+                <div id="heroDetailsGrid" class="hero-details-grid"></div>
+
+                <!-- Public Remarks -->
+                <div id="heroPublicRemarks" class="hero-remarks hidden">
+                    <h4>Public Remarks</h4>
+                    <p id="heroPublicRemarksText"></p>
+                </div>
+
+                <!-- Private Remarks -->
+                <div id="heroPrivateRemarks" class="hero-remarks hero-private-remarks hidden">
+                    <h4>Private / Agent Remarks</h4>
+                    <p id="heroPrivateRemarksText"></p>
+                </div>
+
+                <!-- Listing Meta -->
+                <div id="heroMeta" class="hero-meta"></div>
             </div>
         </div>
 
-        <!-- AGENT INFO -->
-        <div id="agentSection" class="agent-section hidden">
-            <h3 class="section-title">Agent & Office Info</h3>
-            <div id="agentCards" class="agent-cards"></div>
-        </div>
-
-        <!-- REMARKS -->
-        <div id="remarksSection" class="remarks-section hidden">
-            <h3 class="section-title">Description</h3>
-            <p id="remarksText" class="remarks-text"></p>
-        </div>
-
-        <!-- MAP + COMPS -->
+        <!-- ═══ MAP + COMPS ═══ -->
         <div class="map-comps-section">
             <h3 class="section-title">
                 Comps Within &#8539; Mile
