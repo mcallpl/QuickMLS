@@ -2,13 +2,19 @@
 # QuickMLS — Deploy to Digital Ocean
 # Usage: ./deploy.sh
 
-echo "🚀 Deploying QuickMLS to Digital Ocean..."
+SERVER="root@64.227.108.128"
+REMOTE_DIR="/var/www/html/QuickMLS"
 
-# TODO: Configure Digital Ocean deployment
-# Options:
-# 1. rsync over SSH
-# 2. doctl apps deploy
-# 3. Git push to DO App Platform
+echo "Deploying QuickMLS to Digital Ocean..."
 
-echo "⚠️  Digital Ocean deployment not yet configured."
-echo "   Set up your DO droplet/app and update this script."
+rsync -avz \
+    --exclude='config.local.php' \
+    --exclude='.git' \
+    --exclude='.claude' \
+    --exclude='.DS_Store' \
+    --delete \
+    ./ "${SERVER}:${REMOTE_DIR}/"
+
+ssh "${SERVER}" "chown -R www-data:www-data ${REMOTE_DIR}"
+
+echo "Done! Live at: http://64.227.108.128/QuickMLS/"
