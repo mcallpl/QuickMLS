@@ -206,20 +206,25 @@ $v = time();
     </div>
 
     <div class="client-agent-footer">
-        <div class="client-agent-card">
-            <div class="client-agent-name"><?= htmlspecialchars(AGENT_NAME) ?></div>
-            <div class="client-agent-title"><?= htmlspecialchars(AGENT_TITLE) ?> · DRE# <?= htmlspecialchars(AGENT_LICENSE) ?></div>
-            <div class="client-agent-contacts">
-                <a href="tel:<?= preg_replace('/\D/', '', AGENT_PHONE) ?>"><?= htmlspecialchars(AGENT_PHONE) ?></a>
-                <a href="mailto:<?= htmlspecialchars(AGENT_EMAIL) ?>"><?= htmlspecialchars(AGENT_EMAIL) ?></a>
-            </div>
+        <div class="client-agent-photo">
+            <img src="img/chip-and-kim.png" alt="Chip &amp; Kim McAllister">
         </div>
-        <div class="client-agent-card">
-            <div class="client-agent-name"><?= htmlspecialchars(AGENT2_NAME) ?></div>
-            <div class="client-agent-title"><?= htmlspecialchars(AGENT2_TITLE) ?> · DRE# <?= htmlspecialchars(AGENT2_LICENSE) ?></div>
-            <div class="client-agent-contacts">
-                <a href="tel:<?= preg_replace('/\D/', '', AGENT2_PHONE) ?>"><?= htmlspecialchars(AGENT2_PHONE) ?></a>
-                <a href="mailto:<?= htmlspecialchars(AGENT2_EMAIL) ?>"><?= htmlspecialchars(AGENT2_EMAIL) ?></a>
+        <div class="client-agent-cards">
+            <div class="client-agent-card">
+                <div class="client-agent-name"><?= htmlspecialchars(AGENT_NAME) ?></div>
+                <div class="client-agent-title"><?= htmlspecialchars(AGENT_TITLE) ?> · DRE# <?= htmlspecialchars(AGENT_LICENSE) ?></div>
+                <div class="client-agent-contacts">
+                    <a href="tel:<?= preg_replace('/\D/', '', AGENT_PHONE) ?>"><?= htmlspecialchars(AGENT_PHONE) ?></a>
+                    <a href="mailto:<?= htmlspecialchars(AGENT_EMAIL) ?>"><?= htmlspecialchars(AGENT_EMAIL) ?></a>
+                </div>
+            </div>
+            <div class="client-agent-card">
+                <div class="client-agent-name"><?= htmlspecialchars(AGENT2_NAME) ?></div>
+                <div class="client-agent-title"><?= htmlspecialchars(AGENT2_TITLE) ?> · DRE# <?= htmlspecialchars(AGENT2_LICENSE) ?></div>
+                <div class="client-agent-contacts">
+                    <a href="tel:<?= preg_replace('/\D/', '', AGENT2_PHONE) ?>"><?= htmlspecialchars(AGENT2_PHONE) ?></a>
+                    <a href="mailto:<?= htmlspecialchars(AGENT2_EMAIL) ?>"><?= htmlspecialchars(AGENT2_EMAIL) ?></a>
+                </div>
             </div>
         </div>
     </div>

@@ -635,9 +635,22 @@ body {
    CLIENT VIEW — Agent Footer
    ═══════════════════════════════════════════════════════ */
 .client-agent-footer {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 12px; margin-top: 32px; padding-top: 24px;
+    margin-top: 32px; padding-top: 24px;
     border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.client-agent-photo {
+    text-align: center;
+}
+.client-agent-photo img {
+    width: 220px; height: auto;
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow);
+}
+.client-agent-cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; width: 100%;
 }
 .client-agent-card {
     background: var(--bg-card); border: 1px solid var(--border);
