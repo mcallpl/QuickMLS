@@ -103,7 +103,8 @@ try {
     // 4. Get comps within radius (default 1/8 mile, admin-adjustable)
     $radiusMiles = floatval($_POST['radius_miles'] ?? 0.125);
     if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.125;
-    $comps = getComps($geo, $radiusMiles, $selectFields);
+    $propertyType = $subject['PropertyType'] ?? null;
+    $comps = getComps($geo, $radiusMiles, $selectFields, $propertyType);
 
     // 5. Photos for subject + comps
     $allKeys = [];
@@ -195,7 +196,7 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
 }
 
 // ── Get comps within radius ──
-function getComps(array $geo, float $radiusMiles, string $selectFields): array {
+function getComps(array $geo, float $radiusMiles, string $selectFields, ?string $propertyType = null): array {
     $lat = (float)$geo['lat'];
     $lng = (float)$geo['lng'];
     if (!$lat || !$lng) return [];
@@ -211,6 +212,11 @@ function getComps(array $geo, float $radiusMiles, string $selectFields): array {
         "Longitude le " . round($lng + $lngDelta, 6),
         "(StandardStatus eq 'Active' or StandardStatus eq 'Pending' or StandardStatus eq 'ActiveUnderContract' or (StandardStatus eq 'Closed' and CloseDate ge " . date('Y-m-d', strtotime('-180 days')) . "))",
     ];
+
+    // Match the subject's property type (sales vs leases vs land etc.)
+    if ($propertyType) {
+        $filters[] = "PropertyType eq '" . addslashes($propertyType) . "'";
+    }
 
     try {
         $result = trestleGet('Property', [
