@@ -680,8 +680,17 @@
 
     function arr(val) {
         if (!val) return '';
-        if (Array.isArray(val)) return val.join(', ');
-        return String(val);
+        var items;
+        if (Array.isArray(val)) {
+            items = val;
+        } else {
+            // API sometimes returns comma-separated strings without spaces
+            items = String(val).split(',');
+        }
+        // Split CamelCase into readable words (e.g. "BreakfastBar" → "Breakfast Bar")
+        return items.map(function(s) {
+            return s.trim().replace(/([a-z])([A-Z])/g, '$1 $2');
+        }).join(', ');
     }
 
     function addDetail(list, label, value) {
