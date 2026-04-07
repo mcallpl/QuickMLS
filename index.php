@@ -1,5 +1,10 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/session.php';
+
+$loggedIn = isLoggedIn();
+$isAdmin  = isAdmin();
+$user     = currentUser();
 $v = time();
 ?>
 <!DOCTYPE html>
@@ -15,6 +20,48 @@ $v = time();
 </head>
 <body>
 
+<?php if (!$loggedIn): ?>
+<!-- ── LOGIN SCREEN ────────────────────────────────────── -->
+<div class="login-screen">
+    <div class="login-card">
+        <div class="header-brand">
+            <span class="header-icon">&#9889;</span>
+            <h1>QuickMLS</h1>
+        </div>
+        <p class="login-subtitle">Sign in to continue</p>
+        <form id="loginForm" class="login-form">
+            <input type="text" id="loginUser" placeholder="Username" autocomplete="username" required>
+            <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" required>
+            <button type="submit" class="login-btn">Sign In</button>
+            <div id="loginError" class="login-error hidden"></div>
+        </form>
+    </div>
+</div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var fd = new FormData();
+    fd.append('username', document.getElementById('loginUser').value);
+    fd.append('password', document.getElementById('loginPass').value);
+    fetch('api/login.php', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { location.reload(); }
+            else {
+                var el = document.getElementById('loginError');
+                el.textContent = d.error;
+                el.classList.remove('hidden');
+            }
+        })
+        .catch(function() {
+            var el = document.getElementById('loginError');
+            el.textContent = 'Connection error';
+            el.classList.remove('hidden');
+        });
+});
+</script>
+
+<?php else: ?>
 <!-- ── LOADING OVERLAY ──────────────────────────────────── -->
 <div id="loader" class="loader hidden">
     <div class="loader-spinner"></div>
@@ -26,9 +73,24 @@ $v = time();
 
     <!-- HEADER -->
     <header class="header">
-        <div class="header-brand">
-            <span class="header-icon">&#9889;</span>
-            <h1>QuickMLS</h1>
+        <div class="header-top-row">
+            <div class="header-brand">
+                <span class="header-icon">&#9889;</span>
+                <h1>QuickMLS</h1>
+            </div>
+            <div class="header-controls">
+                <!-- Theme Toggle -->
+                <label class="theme-toggle" title="Toggle light/dark mode">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="toggle-slider">
+                        <span class="toggle-icon sun">&#9788;</span>
+                        <span class="toggle-icon moon">&#9790;</span>
+                    </span>
+                </label>
+                <!-- User / Logout -->
+                <span class="header-user"><?= htmlspecialchars($user['username']) ?></span>
+                <a href="#" id="logoutBtn" class="header-logout" title="Sign out">&#9211;</a>
+            </div>
         </div>
         <p class="header-tagline">Type an address. Get the full picture.</p>
     </header>
@@ -48,10 +110,25 @@ $v = time();
             <button type="button" id="clearBtn" class="search-clear hidden">&times;</button>
             <button type="button" id="searchBtn" class="search-go">Go</button>
         </div>
+        <?php if ($isAdmin): ?>
+        <!-- Radius Slider (admin only) -->
+        <div class="radius-control">
+            <label for="radiusSlider">Comp Radius:</label>
+            <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.025" value="0.125">
+            <span id="radiusLabel">1/8 mi</span>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- RESULTS CONTAINER -->
     <div id="results" class="results hidden">
+
+        <?php if ($isAdmin): ?>
+        <!-- Send To Client Button -->
+        <div class="send-client-bar">
+            <button type="button" id="sendClientBtn" class="send-client-btn">&#128233; Send To Client</button>
+        </div>
+        <?php endif; ?>
 
         <!-- ═══ HERO PROPERTY — Full Detail ═══ -->
         <div id="heroSection" class="hero-section">
@@ -119,7 +196,7 @@ $v = time();
         <!-- ═══ MAP + COMPS ═══ -->
         <div class="map-comps-section">
             <h3 class="section-title">
-                Comps Within &#8539; Mile
+                Comps Within <span id="radiusDisplay">&#8539; Mile</span>
                 <span id="compCount" class="comp-count"></span>
             </h3>
             <div id="map" class="map-container"></div>
@@ -136,15 +213,42 @@ $v = time();
 
 </div><!-- /app -->
 
+<!-- Send To Client Modal -->
+<div id="sendModal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Send To Client</h3>
+            <button type="button" id="sendModalClose" class="modal-close">&times;</button>
+        </div>
+        <p class="modal-desc">Send a shareable link for this property to your client via text message. The link will show property details with your contact info only.</p>
+        <form id="sendForm" class="send-form">
+            <label for="clientPhone">Client's Phone Number</label>
+            <input type="tel" id="clientPhone" placeholder="(555) 123-4567" required>
+            <div id="sendStatus" class="send-status hidden"></div>
+            <button type="submit" class="send-submit-btn">&#128233; Send via Text</button>
+        </form>
+        <div id="sendResult" class="send-result hidden">
+            <div class="send-result-icon">&#9989;</div>
+            <p>Link sent successfully!</p>
+            <div id="sendResultUrl" class="send-result-url"></div>
+        </div>
+    </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/app.js?v=<?=$v?>"></script>
 <script>
+var APP_USER = <?= json_encode($user) ?>;
+var IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
+var CLIENT_MODE = false;
 var GOOGLE_MAPS_KEY = <?= json_encode(GOOGLE_MAPS_API_KEY) ?>;
 </script>
+<script src="js/app.js?v=<?=$v?>"></script>
 <script
     src="https://maps.googleapis.com/maps/api/js?key=<?= GOOGLE_MAPS_API_KEY ?>&libraries=places&callback=initPlaces"
     async defer>
 </script>
+
+<?php endif; ?>
 
 </body>
 </html>

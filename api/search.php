@@ -16,10 +16,16 @@ header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../lib/session.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/api.php';
 require_once __DIR__ . '/../lib/geocode.php';
 require_once __DIR__ . '/../lib/photos.php';
+
+// Require login for search (unless called internally)
+if (!defined('INTERNAL_SEARCH_CALL') && !isLoggedIn()) {
+    jsonError('Not authenticated');
+}
 
 function jsonError(string $msg): void {
     echo json_encode(['success' => false, 'error' => $msg]);
@@ -94,8 +100,10 @@ try {
     // 3. Find the subject property — exact address match in MLS
     $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
-    // 4. Get comps within 1/8 mile
-    $comps = getComps($geo, 0.125, $selectFields);
+    // 4. Get comps within radius (default 1/8 mile, admin-adjustable)
+    $radiusMiles = floatval($_POST['radius_miles'] ?? 0.125);
+    if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.125;
+    $comps = getComps($geo, $radiusMiles, $selectFields);
 
     // 5. Photos for subject + comps
     $allKeys = [];
@@ -135,12 +143,13 @@ try {
     usort($comps, fn($a, $b) => ($a['_distance'] ?? 999) <=> ($b['_distance'] ?? 999));
 
     echo json_encode([
-        'success'  => true,
-        'geocoded' => $geo,
-        'subject'  => $subject,
-        'comps'    => $comps,
-        'compCount'=> count($comps),
-        'address'  => $fullAddress,
+        'success'      => true,
+        'geocoded'     => $geo,
+        'subject'      => $subject,
+        'comps'        => $comps,
+        'compCount'    => count($comps),
+        'address'      => $fullAddress,
+        'radius_miles' => $radiusMiles,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Exception $e) {

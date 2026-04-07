@@ -1,57 +1,134 @@
 /* ============================================================
    QuickMLS — Main Application JS
    Hero property with full detail + comp swap
+   Theme toggle, radius control, send-to-client, client mode
    ============================================================ */
 
 (function() {
     'use strict';
 
+    // ── Mode detection ──
+    var clientMode = (typeof CLIENT_MODE !== 'undefined') && CLIENT_MODE;
+
     // ── DOM refs ──
-    const addressInput = document.getElementById('addressInput');
-    const clearBtn     = document.getElementById('clearBtn');
-    const searchBtn    = document.getElementById('searchBtn');
-    const loader       = document.getElementById('loader');
-    const resultsEl    = document.getElementById('results');
-    const noResults    = document.getElementById('noResults');
+    var addressInput = document.getElementById('addressInput');
+    var clearBtn     = document.getElementById('clearBtn');
+    var searchBtn    = document.getElementById('searchBtn');
+    var loader       = document.getElementById('loader');
+    var resultsEl    = document.getElementById('results');
+    var noResults    = document.getElementById('noResults');
 
     // State
-    let appData   = null;   // full API response
-    let heroData  = null;   // current hero property
-    let compsData = [];     // current comps list (includes the previous hero when swapped)
-    let carouselIdx = 0;
-    let map = null;
-    let markers = [];
+    var appData     = null;
+    var heroData    = null;
+    var compsData   = [];
+    var carouselIdx = 0;
+    var map         = null;
+    var markers     = [];
+    var currentRadius = 0.125;  // miles
 
-    // ── Clear button ──
-    addressInput.addEventListener('input', function() {
-        clearBtn.classList.toggle('hidden', !this.value);
-    });
-    clearBtn.addEventListener('click', function() {
-        addressInput.value = '';
-        clearBtn.classList.add('hidden');
-        addressInput.focus();
-    });
+    // ═══════════════════════════════════════════════════════════
+    //  THEME TOGGLE
+    // ═══════════════════════════════════════════════════════════
 
-    // ── Search triggers ──
-    searchBtn.addEventListener('click', doSearch);
-    addressInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') setTimeout(doSearch, 150);
-    });
+    var themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        // Load saved preference
+        var savedTheme = localStorage.getItem('quickmls_theme');
+        if (savedTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            themeToggle.checked = true;
+        }
 
-    // ── Carousel arrows ──
-    document.getElementById('carouselLeft').addEventListener('click', function() { moveCarousel(-1); });
-    document.getElementById('carouselRight').addEventListener('click', function() { moveCarousel(1); });
+        themeToggle.addEventListener('change', function() {
+            var theme = this.checked ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('quickmls_theme', theme);
+            // Rebuild map with correct tiles if visible
+            if (map && appData) {
+                renderMap(appData.geocoded, heroData, compsData);
+            }
+        });
+    }
 
-    // ── Main search ──
-    function doSearch() {
-        var addr = addressInput.value.trim();
+    // ═══════════════════════════════════════════════════════════
+    //  RADIUS CONTROL (admin only)
+    // ═══════════════════════════════════════════════════════════
+
+    var radiusSlider = document.getElementById('radiusSlider');
+    var radiusLabel  = document.getElementById('radiusLabel');
+    if (radiusSlider) {
+        radiusSlider.addEventListener('input', function() {
+            currentRadius = parseFloat(this.value);
+            radiusLabel.textContent = formatRadius(currentRadius);
+        });
+    }
+
+    function formatRadius(miles) {
+        if (Math.abs(miles - 0.125) < 0.01) return '1/8 mi';
+        if (Math.abs(miles - 0.25) < 0.01)  return '1/4 mi';
+        if (Math.abs(miles - 0.5) < 0.01)   return '1/2 mi';
+        if (Math.abs(miles - 1.0) < 0.01)   return '1 mi';
+        return miles.toFixed(2) + ' mi';
+    }
+
+    function updateRadiusDisplay() {
+        var el = document.getElementById('radiusDisplay');
+        if (el) el.textContent = formatRadius(currentRadius);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  LOGOUT
+    // ═══════════════════════════════════════════════════════════
+
+    var logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch('api/logout.php').then(function() { location.reload(); });
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SEARCH
+    // ═══════════════════════════════════════════════════════════
+
+    if (addressInput && clearBtn) {
+        addressInput.addEventListener('input', function() {
+            clearBtn.classList.toggle('hidden', !this.value);
+        });
+        clearBtn.addEventListener('click', function() {
+            addressInput.value = '';
+            clearBtn.classList.add('hidden');
+            addressInput.focus();
+        });
+    }
+
+    if (searchBtn) searchBtn.addEventListener('click', doSearch);
+    if (addressInput) {
+        addressInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') setTimeout(doSearch, 150);
+        });
+    }
+
+    // Carousel arrows
+    var carLeft = document.getElementById('carouselLeft');
+    var carRight = document.getElementById('carouselRight');
+    if (carLeft) carLeft.addEventListener('click', function() { moveCarousel(-1); });
+    if (carRight) carRight.addEventListener('click', function() { moveCarousel(1); });
+
+    function doSearch(overrideAddr, overrideRadius) {
+        var addr = overrideAddr || (addressInput ? addressInput.value.trim() : '');
         if (!addr) return;
+
+        var radius = overrideRadius || currentRadius;
 
         showLoader();
         hideResults();
 
         var form = new FormData();
         form.append('full_address', addr);
+        form.append('radius_miles', radius);
 
         fetch('api/search.php', { method: 'POST', body: form })
             .then(function(r) { return r.json(); })
@@ -60,8 +137,8 @@
                 if (!data.success) { showNoResults(data.error || 'Search failed.'); return; }
 
                 appData = data;
+                currentRadius = data.radius_miles || radius;
 
-                // Pick the best hero: subject if found, otherwise first comp
                 if (data.subject) {
                     heroData = data.subject;
                     compsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
@@ -81,6 +158,12 @@
             });
     }
 
+    // Expose for client mode auto-search
+    window.autoClientSearch = function(addr, radius) {
+        currentRadius = radius;
+        doSearch(addr, radius);
+    };
+
     // ── Render everything ──
     function renderAll() {
         resultsEl.classList.remove('hidden');
@@ -89,6 +172,7 @@
         renderMap(appData.geocoded, heroData, compsData);
         renderCompCards(compsData);
         document.getElementById('compCount').textContent = '(' + compsData.length + ' properties)';
+        updateRadiusDisplay();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -173,11 +257,15 @@
 
         // ── Agent Cards ──
         var agentsHtml = '';
-        agentsHtml += agentCardHtml('Listing Agent', p.ListAgentFullName, p.ListOfficeName, p.ListAgentDirectPhone, p.ListAgentEmail, p.ListOfficePhone);
-        agentsHtml += agentCardHtml('Buyer Agent', p.BuyerAgentFullName, p.BuyerOfficeName, p.BuyerAgentDirectPhone, p.BuyerAgentEmail, p.BuyerOfficePhone);
-        agentsHtml += agentCardHtml('Co-List Agent', p.CoListAgentFullName, null, p.CoListAgentDirectPhone, p.CoListAgentEmail);
-        agentsHtml += agentCardHtml('Showing Contact', p.ShowingContactName, p.ShowingContactType, p.ShowingContactPhone);
-
+        if (clientMode) {
+            // Client view: show ONLY Chip & Kim's info (injected by PHP in view.php footer)
+            agentsHtml = ''; // Agent info is in the footer for client mode
+        } else {
+            agentsHtml += agentCardHtml('Listing Agent', p.ListAgentFullName, p.ListOfficeName, p.ListAgentDirectPhone, p.ListAgentEmail, p.ListOfficePhone);
+            agentsHtml += agentCardHtml('Buyer Agent', p.BuyerAgentFullName, p.BuyerOfficeName, p.BuyerAgentDirectPhone, p.BuyerAgentEmail, p.BuyerOfficePhone);
+            agentsHtml += agentCardHtml('Co-List Agent', p.CoListAgentFullName, null, p.CoListAgentDirectPhone, p.CoListAgentEmail);
+            agentsHtml += agentCardHtml('Showing Contact', p.ShowingContactName, p.ShowingContactType, p.ShowingContactPhone);
+        }
         document.getElementById('heroAgents').innerHTML = agentsHtml;
 
         // ── Property Details Grid ──
@@ -234,24 +322,28 @@
             pubSection.classList.add('hidden');
         }
 
-        // ── Private Remarks ──
+        // ── Private Remarks (admin only, never in client mode) ──
         var privSection = document.getElementById('heroPrivateRemarks');
-        if (p.PrivateRemarks) {
-            document.getElementById('heroPrivateRemarksText').textContent = p.PrivateRemarks;
-            privSection.classList.remove('hidden');
-        } else {
-            privSection.classList.add('hidden');
+        if (privSection) {
+            if (p.PrivateRemarks && !clientMode) {
+                document.getElementById('heroPrivateRemarksText').textContent = p.PrivateRemarks;
+                privSection.classList.remove('hidden');
+            } else {
+                privSection.classList.add('hidden');
+            }
         }
 
-        // ── Showing Instructions ──
+        // ── Showing Instructions + Meta ──
         var metaHtml = '';
-        if (p.ShowingInstructions) {
-            metaHtml += '<div class="meta-row"><strong>Showing Instructions:</strong> ' + esc(p.ShowingInstructions) + '</div>';
+        if (!clientMode) {
+            if (p.ShowingInstructions) {
+                metaHtml += '<div class="meta-row"><strong>Showing Instructions:</strong> ' + esc(p.ShowingInstructions) + '</div>';
+            }
         }
         if (p.ListingContractDate) {
             metaHtml += '<div class="meta-row"><strong>Listed:</strong> ' + esc(p.ListingContractDate) + '</div>';
         }
-        if (p.CumulativeDaysOnMarket != null) {
+        if (p.CumulativeDaysOnMarket != null && !clientMode) {
             metaHtml += '<div class="meta-row"><strong>Cumulative DOM:</strong> ' + p.CumulativeDaysOnMarket + '</div>';
         }
         if (p.ModificationTimestamp) {
@@ -340,7 +432,9 @@
             if (c._distanceFt) {
                 html += '<div class="comp-card-distance">' + num(c._distanceFt) + ' ft away</div>';
             }
-            if (c.ListAgentFullName) {
+
+            // In client mode, don't show other agent info on comp cards
+            if (!clientMode && c.ListAgentFullName) {
                 html += '<div class="comp-card-agent">&#128100; ' + esc(c.ListAgentFullName);
                 if (c.ListAgentDirectPhone) html += ' &middot; ' + esc(c.ListAgentDirectPhone);
                 html += '</div>';
@@ -356,15 +450,12 @@
                 var clickedIdx = parseInt(this.dataset.compIdx);
                 var clickedComp = compsData[clickedIdx];
 
-                // Old hero goes into comps at the position of the clicked comp
                 var oldHero = heroData;
-                // Compute distance for old hero (so it shows in comp card)
                 if (oldHero.Latitude && oldHero.Longitude && appData.geocoded) {
                     oldHero._distance = haversine(appData.geocoded.lat, appData.geocoded.lng, oldHero.Latitude, oldHero.Longitude);
                     oldHero._distanceFt = Math.round(oldHero._distance * 5280);
                 }
 
-                // Swap
                 heroData = clickedComp;
                 compsData[clickedIdx] = oldHero;
 
@@ -381,15 +472,21 @@
         if (map) { map.remove(); map = null; }
         markers = [];
 
-        map = L.map(mapEl).setView([geo.lat, geo.lng], 16);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        map = L.map(mapEl).setView([geo.lat, geo.lng], getZoomForRadius(currentRadius));
+
+        var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        var tileUrl = isDark
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+        L.tileLayer(tileUrl, {
             attribution: '&copy; OSM &copy; CARTO',
             maxZoom: 19,
         }).addTo(map);
 
-        // 1/8 mile radius circle
+        // Radius circle
+        var radiusMeters = currentRadius * 1609.34;
         L.circle([geo.lat, geo.lng], {
-            radius: 201, color: '#58a6ff', fillColor: '#58a6ff',
+            radius: radiusMeters, color: '#58a6ff', fillColor: '#58a6ff',
             fillOpacity: 0.08, weight: 1.5, dashArray: '6,4',
         }).addTo(map);
 
@@ -419,7 +516,7 @@
             var popup = '<div class="popup-price">$' + (cp ? num(cp) : '—') + '</div>';
             popup += '<div class="popup-addr">' + esc(formatAddr(c)) + '</div>';
             popup += '<div style="margin-top:4px;font-size:12px;">' + (c.BedroomsTotal||'—') + ' bd | ' + (c.BathroomsTotalInteger||'—') + ' ba | ' + (c.LivingArea ? num(c.LivingArea) + ' sqft' : '—') + '</div>';
-            if (c.ListAgentFullName) popup += '<div style="font-size:11px;color:#58a6ff;margin-top:2px;">' + esc(c.ListAgentFullName) + '</div>';
+            if (!clientMode && c.ListAgentFullName) popup += '<div style="font-size:11px;color:#58a6ff;margin-top:2px;">' + esc(c.ListAgentFullName) + '</div>';
             m.bindPopup(popup);
             markers.push(m);
         });
@@ -427,13 +524,90 @@
         setTimeout(function() { map.invalidateSize(); }, 100);
     }
 
+    function getZoomForRadius(miles) {
+        if (miles <= 0.125) return 16;
+        if (miles <= 0.25)  return 15;
+        if (miles <= 0.5)   return 14;
+        if (miles <= 1.0)   return 13;
+        return 12;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SEND TO CLIENT (modal)
+    // ═══════════════════════════════════════════════════════════
+
+    var sendBtn   = document.getElementById('sendClientBtn');
+    var sendModal = document.getElementById('sendModal');
+    var sendClose = document.getElementById('sendModalClose');
+    var sendForm  = document.getElementById('sendForm');
+
+    if (sendBtn && sendModal) {
+        sendBtn.addEventListener('click', function() {
+            // Reset modal state
+            document.getElementById('sendStatus').classList.add('hidden');
+            document.getElementById('sendResult').classList.add('hidden');
+            sendForm.classList.remove('hidden');
+            document.getElementById('clientPhone').value = '';
+            sendModal.classList.remove('hidden');
+        });
+
+        sendClose.addEventListener('click', function() {
+            sendModal.classList.add('hidden');
+        });
+
+        sendModal.addEventListener('click', function(e) {
+            if (e.target === sendModal) sendModal.classList.add('hidden');
+        });
+
+        sendForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            var phone = document.getElementById('clientPhone').value.trim();
+            if (!phone) return;
+
+            var statusEl = document.getElementById('sendStatus');
+            statusEl.textContent = 'Sending...';
+            statusEl.className = 'send-status';
+
+            var addr = addressInput ? addressInput.value.trim() : '';
+            if (appData && appData.address) addr = appData.address;
+
+            var fd = new FormData();
+            fd.append('address', addr);
+            fd.append('radius_miles', currentRadius);
+            fd.append('client_phone', phone);
+
+            fetch('api/share.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.success) {
+                        sendForm.classList.add('hidden');
+                        var resultEl = document.getElementById('sendResult');
+                        document.getElementById('sendResultUrl').textContent = d.share_url;
+                        resultEl.classList.remove('hidden');
+                        if (!d.sms_sent) {
+                            statusEl.textContent = 'Link created but SMS could not be sent. Copy the link below:';
+                            statusEl.className = 'send-status send-status-warn';
+                        }
+                    } else {
+                        statusEl.textContent = d.error || 'Failed to create link';
+                        statusEl.className = 'send-status send-status-error';
+                    }
+                })
+                .catch(function(err) {
+                    statusEl.textContent = 'Network error: ' + err.message;
+                    statusEl.className = 'send-status send-status-error';
+                });
+        });
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  HELPERS
     // ═══════════════════════════════════════════════════════════
 
-    function showLoader() { loader.classList.remove('hidden'); }
-    function hideLoader() { loader.classList.add('hidden'); }
-    function hideResults() { resultsEl.classList.add('hidden'); noResults.classList.add('hidden'); }
+    function showLoader() { if (loader) loader.classList.remove('hidden'); }
+    function hideLoader() { if (loader) loader.classList.add('hidden'); }
+    function hideResults() { if (resultsEl) resultsEl.classList.add('hidden'); if (noResults) noResults.classList.add('hidden'); }
     function showNoResults(msg) { document.getElementById('noResultsMsg').textContent = msg; noResults.classList.remove('hidden'); }
 
     function setText(id, val) { document.getElementById(id).textContent = val != null ? val : '—'; }
@@ -491,6 +665,7 @@
 
     // ── Google Places Autocomplete ──
     window.initPlaces = function() {
+        if (!addressInput) return; // Client mode has no search input
         var autocomplete = new google.maps.places.Autocomplete(addressInput, {
             types: ['address'],
             componentRestrictions: { country: 'us' },
