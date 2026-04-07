@@ -16,7 +16,7 @@ $token = trim($_GET['t'] ?? '');
 if (!$token) { http_response_code(404); echo 'Invalid link.'; exit; }
 
 $db   = getDb();
-$stmt = $db->prepare("SELECT address, radius_miles FROM shares WHERE token = ?");
+$stmt = $db->prepare("SELECT address, hero_listing_key, radius_miles FROM shares WHERE token = ?");
 $stmt->bind_param('s', $token);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -25,8 +25,9 @@ $stmt->close();
 
 if (!$share) { http_response_code(404); echo 'This link has expired or is invalid.'; exit; }
 
-$shareAddress = $share['address'];
-$shareRadius  = (float)$share['radius_miles'];
+$shareAddress    = $share['address'];
+$heroListingKey  = $share['hero_listing_key'] ?? '';
+$shareRadius     = (float)$share['radius_miles'];
 
 // ── Do the search server-side ──
 $searchData = null;
@@ -62,6 +63,33 @@ try {
 
     if ($geo) {
         $subject = findSubjectProperty($addrParts, $geo, $selectFields);
+
+        // If we have a specific hero ListingKey, make sure we use it
+        if ($heroListingKey) {
+            // Try to find the hero by ListingKey in subject or via direct lookup
+            if (!$subject || ($subject['ListingKey'] ?? '') !== $heroListingKey) {
+                // Direct lookup by ListingKey
+                try {
+                    $heroResult = trestleGet('Property', [
+                        '$filter'  => "ListingKey eq '" . addslashes($heroListingKey) . "'",
+                        '$select'  => $selectFields,
+                        '$top'     => 1,
+                    ]);
+                    $heroProps = $heroResult['value'] ?? [];
+                    if (!empty($heroProps)) {
+                        $subject = $heroProps[0];
+                        // Use hero's coordinates for geocoding if available
+                        if ($subject['Latitude'] && $subject['Longitude']) {
+                            $geo['lat'] = (float)$subject['Latitude'];
+                            $geo['lng'] = (float)$subject['Longitude'];
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Fall back to address-based subject
+                }
+            }
+        }
+
         // Get ALL comps — frontend handles type filtering via checkboxes
         $comps = getComps($geo, $shareRadius, $selectFields);
 

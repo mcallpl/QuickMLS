@@ -38,6 +38,7 @@ $db->query("
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         token VARCHAR(64) NOT NULL UNIQUE,
         address TEXT NOT NULL,
+        hero_listing_key VARCHAR(50) DEFAULT NULL,
         radius_miles DECIMAL(6,4) NOT NULL DEFAULT 0.1250,
         created_by INT UNSIGNED,
         client_phone VARCHAR(20),

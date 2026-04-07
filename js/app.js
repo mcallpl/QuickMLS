@@ -637,11 +637,17 @@
             statusEl.textContent = 'Sending...';
             statusEl.className = 'send-status';
 
-            var addr = addressInput ? addressInput.value.trim() : '';
-            if (appData && appData.address) addr = appData.address;
+            // Use the CURRENT hero's address, not the search bar
+            var heroAddr = '';
+            if (heroData) {
+                heroAddr = [heroData.StreetNumber, heroData.StreetDirPrefix, heroData.StreetName, heroData.StreetSuffix, heroData.StreetDirSuffix].filter(Boolean).join(' ');
+                if (heroData.UnitNumber) heroAddr += ' #' + heroData.UnitNumber;
+                heroAddr += ', ' + [heroData.City, heroData.StateOrProvince, heroData.PostalCode].filter(Boolean).join(', ');
+            }
 
             var fd = new FormData();
-            fd.append('address', addr);
+            fd.append('address', heroAddr || (appData && appData.address) || '');
+            fd.append('hero_listing_key', heroData ? (heroData.ListingKey || '') : '');
             fd.append('radius_miles', currentRadius);
             fd.append('client_phone', phone);
 

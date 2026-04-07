@@ -19,9 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$address     = trim($_POST['address'] ?? '');
-$radiusMiles = floatval($_POST['radius_miles'] ?? 0.125);
-$clientPhone = trim($_POST['client_phone'] ?? '');
+$address        = trim($_POST['address'] ?? '');
+$heroListingKey = trim($_POST['hero_listing_key'] ?? '');
+$radiusMiles    = floatval($_POST['radius_miles'] ?? 0.125);
+$clientPhone    = trim($_POST['client_phone'] ?? '');
 
 if (!$address) {
     echo json_encode(['success' => false, 'error' => 'Address is required']);
@@ -42,8 +43,8 @@ $token = bin2hex(random_bytes(16));
 
 // Save to database
 $db   = getDb();
-$stmt = $db->prepare("INSERT INTO shares (token, address, radius_miles, created_by, client_phone) VALUES (?, ?, ?, ?, ?)");
-$stmt->bind_param('ssdis', $token, $address, $radiusMiles, $_SESSION['user_id'], $phoneFull);
+$stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, created_by, client_phone) VALUES (?, ?, ?, ?, ?, ?)");
+$stmt->bind_param('sssdis', $token, $address, $heroListingKey, $radiusMiles, $_SESSION['user_id'], $phoneFull);
 $stmt->execute();
 $stmt->close();
 
