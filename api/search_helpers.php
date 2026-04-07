@@ -11,8 +11,16 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
         $filters[] = "StreetNumber eq '" . addslashes($addrParts['number']) . "'";
     }
     if ($addrParts['street']) {
-        $streetWord = strtok($addrParts['street'], ' ');
-        $filters[] = "contains(StreetName, '" . addslashes($streetWord) . "')";
+        // Use all significant words from the street name for a tighter match
+        $streetWords = preg_split('/\s+/', $addrParts['street']);
+        foreach ($streetWords as $word) {
+            $word = trim($word);
+            // Skip common suffixes — they may not be in StreetName (they're in StreetSuffix)
+            if (in_array(strtolower($word), ['st','ave','blvd','dr','rd','ln','ct','cir','pl','way','pkwy','ter','trl'])) continue;
+            if (strlen($word) >= 2) {
+                $filters[] = "contains(StreetName, '" . addslashes($word) . "')";
+            }
+        }
     }
     if ($addrParts['city']) {
         $filters[] = "City eq '" . addslashes($addrParts['city']) . "'";
@@ -32,6 +40,24 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
 
         $props = $result['value'] ?? [];
         if (empty($props)) return null;
+
+        // Prefer exact street number + street name match
+        if ($addrParts['number']) {
+            foreach ($props as $p) {
+                if (($p['StreetNumber'] ?? '') === $addrParts['number']) {
+                    // Also verify street name contains all words
+                    $sn = strtolower($p['StreetName'] ?? '');
+                    $streetWords = preg_split('/\s+/', strtolower($addrParts['street']));
+                    $match = true;
+                    foreach ($streetWords as $w) {
+                        if (in_array($w, ['st','ave','blvd','dr','rd','ln','ct','cir','pl','way','pkwy','ter','trl'])) continue;
+                        if (strlen($w) >= 2 && strpos($sn, $w) === false) { $match = false; break; }
+                    }
+                    if ($match) return $p;
+                }
+            }
+        }
+
         return $props[0];
     } catch (Exception $e) {
         return null;
