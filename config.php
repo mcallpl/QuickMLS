@@ -42,7 +42,7 @@ define('AGENT_PHONE',       '(949) 735-9415');
 // ── Agent Profile (Kim) ──────────────────────────────────
 define('AGENT2_NAME',       'Kim McAllister');
 define('AGENT2_TITLE',      'Realtor');
-define('AGENT2_LICENSE',    '01925587');
+define('AGENT2_LICENSE',    '01967564');
 define('AGENT2_EMAIL',      'Kim@chipandkim.com');
 define('AGENT2_PHONE',      '(949) 735-4047');
 
