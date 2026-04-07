@@ -171,6 +171,9 @@
         var form = new FormData();
         form.append('full_address', addr);
         form.append('radius_miles', radius);
+        if (clientMode && typeof SHARE_TOKEN !== 'undefined') {
+            form.append('share_token', SHARE_TOKEN);
+        }
 
         fetch('api/search.php', { method: 'POST', body: form })
             .then(function(r) { return r.json(); })

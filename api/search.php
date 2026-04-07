@@ -22,9 +22,22 @@ require_once __DIR__ . '/../lib/api.php';
 require_once __DIR__ . '/../lib/geocode.php';
 require_once __DIR__ . '/../lib/photos.php';
 
-// Require login for search (unless called internally)
-if (!defined('INTERNAL_SEARCH_CALL') && !isLoggedIn()) {
+// Require login for search (unless a valid share token is provided)
+$shareToken = trim($_POST['share_token'] ?? '');
+if (!isLoggedIn() && !$shareToken) {
     jsonError('Not authenticated');
+}
+if ($shareToken && !isLoggedIn()) {
+    require_once __DIR__ . '/../lib/db.php';
+    $db = getDb();
+    $stmt = $db->prepare("SELECT id FROM shares WHERE token = ?");
+    $stmt->bind_param('s', $shareToken);
+    $stmt->execute();
+    if (!$stmt->get_result()->fetch_assoc()) {
+        $stmt->close();
+        jsonError('Invalid share link');
+    }
+    $stmt->close();
 }
 
 function jsonError(string $msg): void {

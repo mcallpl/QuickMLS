@@ -157,6 +157,7 @@ $v = time();
 <script>
 // Client mode — auto-search with locked settings, no other agent info
 var CLIENT_MODE = true;
+var SHARE_TOKEN = <?= json_encode($token) ?>;
 var SHARE_ADDRESS = <?= json_encode($shareAddress) ?>;
 var SHARE_RADIUS = <?= json_encode((float)$shareRadius) ?>;
 var GOOGLE_MAPS_KEY = <?= json_encode(GOOGLE_MAPS_API_KEY) ?>;

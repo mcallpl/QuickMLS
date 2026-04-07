@@ -44,7 +44,7 @@ define('AGENT2_NAME',       'Kim McAllister');
 define('AGENT2_TITLE',      'Realtor');
 define('AGENT2_LICENSE',    '01967564');
 define('AGENT2_EMAIL',      'Kim@chipandkim.com');
-define('AGENT2_PHONE',      '(949) 735-4047');
+define('AGENT2_PHONE',      '(949) 735-9416');
 
 // ── Team / Branding ──────────────────────────────────────
 define('TEAM_NAME',         'Chip & Kim McAllister');
