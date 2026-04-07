@@ -108,7 +108,7 @@ function getComps(array $geo, float $radiusMiles, string $selectFields, ?string 
 
 function parseAddressString(string $addr): array {
     $parts = ['number'=>'','street'=>'','city'=>'','state'=>'','zip'=>''];
-    if (preg_match('/^(\d+)\s+(.+?),\s*(.+?),?\s*([A-Z]{2})\s*(\d{5})?/i', $addr, $m)) {
+    if (preg_match('/^(\d+)\s+(.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?/i', $addr, $m)) {
         $parts['number'] = $m[1];
         $parts['street'] = trim($m[2]);
         $parts['city']   = trim($m[3]);
