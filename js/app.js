@@ -627,6 +627,52 @@
             if (e.target === sendModal) sendModal.classList.add('hidden');
         });
 
+        // ── Contact autocomplete ──
+        var clientSearch = document.getElementById('clientSearch');
+        var contactResults = document.getElementById('contactResults');
+        var contactDebounce = null;
+
+        if (clientSearch) {
+            clientSearch.addEventListener('input', function() {
+                var q = this.value.trim();
+                if (q.length < 2) { contactResults.classList.add('hidden'); return; }
+
+                clearTimeout(contactDebounce);
+                contactDebounce = setTimeout(function() {
+                    fetch('api/contacts.php?q=' + encodeURIComponent(q))
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            var contacts = d.contacts || [];
+                            if (contacts.length === 0) {
+                                contactResults.innerHTML = '<div class="contact-item contact-none">No contacts found</div>';
+                            } else {
+                                contactResults.innerHTML = contacts.map(function(c) {
+                                    return '<div class="contact-item" data-phone="' + escAttr(c.phone) + '">'
+                                        + '<span class="contact-name">' + esc(c.name) + '</span>'
+                                        + '<span class="contact-phone">' + esc(c.phone) + '</span>'
+                                        + '</div>';
+                                }).join('');
+                            }
+                            contactResults.classList.remove('hidden');
+
+                            // Click to select
+                            contactResults.querySelectorAll('.contact-item[data-phone]').forEach(function(el) {
+                                el.addEventListener('click', function() {
+                                    document.getElementById('clientPhone').value = this.dataset.phone;
+                                    clientSearch.value = this.querySelector('.contact-name').textContent;
+                                    contactResults.classList.add('hidden');
+                                });
+                            });
+                        });
+                }, 250);
+            });
+
+            // Hide results on blur (delayed so click can register)
+            clientSearch.addEventListener('blur', function() {
+                setTimeout(function() { contactResults.classList.add('hidden'); }, 200);
+            });
+        }
+
         sendForm.addEventListener('submit', function(e) {
             e.preventDefault();
 

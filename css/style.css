@@ -643,6 +643,32 @@ body {
 }
 .send-submit-btn:hover { opacity: 0.85; }
 
+/* ── Contact Search Autocomplete ──────────────────────── */
+.contact-search-wrap {
+    position: relative;
+}
+.contact-results {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow);
+    max-height: 200px; overflow-y: auto; z-index: 10;
+    margin-top: 2px;
+}
+.contact-item {
+    padding: 10px 14px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+}
+.contact-item:last-child { border-bottom: none; }
+.contact-item:hover { background: var(--bg-card2); }
+.contact-item.contact-none {
+    color: var(--text-dim); cursor: default; font-size: 13px;
+    justify-content: center;
+}
+.contact-name { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.contact-phone { font-size: 13px; color: var(--accent); }
+
 .send-status { font-size: 13px; color: var(--accent); margin-top: 4px; }
 .send-status-error { color: var(--red); }
 .send-status-warn { color: var(--orange); }

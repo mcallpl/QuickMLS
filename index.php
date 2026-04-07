@@ -248,7 +248,12 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         </div>
         <p class="modal-desc">Send a shareable link for this property to your client via text message. The link will show property details with your contact info only.</p>
         <form id="sendForm" class="send-form">
-            <label for="clientPhone">Client's Phone Number</label>
+            <label for="clientSearch">Search Contact</label>
+            <div class="contact-search-wrap">
+                <input type="text" id="clientSearch" placeholder="Start typing a name..." autocomplete="off">
+                <div id="contactResults" class="contact-results hidden"></div>
+            </div>
+            <label for="clientPhone">Phone Number</label>
             <input type="tel" id="clientPhone" placeholder="(555) 123-4567" required>
             <div id="sendStatus" class="send-status hidden"></div>
             <button type="submit" class="send-submit-btn">&#128233; Send via Text</button>
