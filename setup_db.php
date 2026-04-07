@@ -41,7 +41,7 @@ $db->query("
         hero_listing_key VARCHAR(50) DEFAULT NULL,
         radius_miles DECIMAL(6,4) NOT NULL DEFAULT 0.1250,
         created_by INT UNSIGNED,
-        client_phone VARCHAR(20),
+        client_phone VARCHAR(500),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB
