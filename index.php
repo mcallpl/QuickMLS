@@ -110,14 +110,6 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             <button type="button" id="clearBtn" class="search-clear hidden">&times;</button>
             <button type="button" id="searchBtn" class="search-go">Go</button>
         </div>
-        <?php if ($isAdmin): ?>
-        <!-- Radius Slider (admin only) -->
-        <div class="radius-control">
-            <label for="radiusSlider">Comp Radius:</label>
-            <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.025" value="0.125">
-            <span id="radiusLabel">1/8 mi</span>
-        </div>
-        <?php endif; ?>
     </div>
 
     <!-- RESULTS CONTAINER -->
@@ -200,6 +192,13 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
                 <span id="compCount" class="comp-count"></span>
             </h3>
             <div id="map" class="map-container"></div>
+            <?php if ($isAdmin): ?>
+            <div class="radius-control">
+                <label for="radiusSlider">Comp Radius:</label>
+                <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.025" value="0.125">
+                <span id="radiusLabel">1/8 mi</span>
+            </div>
+            <?php endif; ?>
             <div id="compsList" class="comps-list"></div>
         </div>
 

@@ -26,6 +26,8 @@
     var map         = null;
     var markers     = [];
     var currentRadius = 0.125;  // miles
+    var radiusCircle  = null;   // Leaflet circle layer
+    var radiusDebounce = null;  // debounce timer for re-fetch
 
     // ═══════════════════════════════════════════════════════════
     //  THEME TOGGLE
@@ -55,12 +57,36 @@
     //  RADIUS CONTROL (admin only)
     // ═══════════════════════════════════════════════════════════
 
-    var radiusSlider = document.getElementById('radiusSlider');
-    var radiusLabel  = document.getElementById('radiusLabel');
-    if (radiusSlider) {
+    function initRadiusSlider() {
+        var radiusSlider = document.getElementById('radiusSlider');
+        var radiusLabel  = document.getElementById('radiusLabel');
+        if (!radiusSlider) return;
+
+        // Sync slider to current radius
+        radiusSlider.value = currentRadius;
+        radiusLabel.textContent = formatRadius(currentRadius);
+
         radiusSlider.addEventListener('input', function() {
             currentRadius = parseFloat(this.value);
             radiusLabel.textContent = formatRadius(currentRadius);
+            updateRadiusDisplay();
+
+            // Instantly resize the circle on the map
+            if (radiusCircle) {
+                radiusCircle.setRadius(currentRadius * 1609.34);
+            }
+            // Adjust zoom to fit
+            if (map) {
+                map.setZoom(getZoomForRadius(currentRadius));
+            }
+
+            // Debounced re-fetch comps
+            clearTimeout(radiusDebounce);
+            radiusDebounce = setTimeout(function() {
+                if (appData && appData.address) {
+                    doSearch(appData.address, currentRadius);
+                }
+            }, 400);
         });
     }
 
@@ -173,6 +199,7 @@
         renderCompCards(compsData);
         document.getElementById('compCount').textContent = '(' + compsData.length + ' properties)';
         updateRadiusDisplay();
+        initRadiusSlider();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -483,9 +510,9 @@
             maxZoom: 19,
         }).addTo(map);
 
-        // Radius circle
+        // Radius circle (keep reference for live resizing)
         var radiusMeters = currentRadius * 1609.34;
-        L.circle([geo.lat, geo.lng], {
+        radiusCircle = L.circle([geo.lat, geo.lng], {
             radius: radiusMeters, color: '#58a6ff', fillColor: '#58a6ff',
             fillOpacity: 0.08, weight: 1.5, dashArray: '6,4',
         }).addTo(map);
