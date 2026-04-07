@@ -107,6 +107,17 @@ try {
     $propertyType = $subject['PropertyType'] ?? null;
     $comps = getComps($geo, $radiusMiles, $selectFields, $propertyType);
 
+    // If no subject was found, use the first comp as the reference type
+    // and filter out any comps that don't match its PropertyType
+    if (!$propertyType && !empty($comps)) {
+        $propertyType = $comps[0]['PropertyType'] ?? null;
+        if ($propertyType) {
+            $comps = array_values(array_filter($comps, function($c) use ($propertyType) {
+                return ($c['PropertyType'] ?? '') === $propertyType;
+            }));
+        }
+    }
+
     // 5. Photos for subject + comps
     $allKeys = [];
     if ($subject) $allKeys[] = $subject['ListingKey'];
