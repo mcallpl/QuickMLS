@@ -62,18 +62,8 @@ try {
 
     if ($geo) {
         $subject = findSubjectProperty($addrParts, $geo, $selectFields);
-        $propertyType = $subject['PropertyType'] ?? null;
-        $comps = getComps($geo, $shareRadius, $selectFields, $propertyType);
-
-        // If no subject, use first comp's type and filter the rest
-        if (!$propertyType && !empty($comps)) {
-            $propertyType = $comps[0]['PropertyType'] ?? null;
-            if ($propertyType) {
-                $comps = array_values(array_filter($comps, function($c) use ($propertyType) {
-                    return ($c['PropertyType'] ?? '') === $propertyType;
-                }));
-            }
-        }
+        // Get ALL comps — frontend handles type filtering via checkboxes
+        $comps = getComps($geo, $shareRadius, $selectFields);
 
         // Photos
         $allKeys = [];
@@ -206,6 +196,7 @@ $v = time();
                 <span id="compCount" class="comp-count"></span>
             </h3>
             <div id="map" class="map-container"></div>
+            <div id="compFilters" class="comp-filters hidden"></div>
             <div id="compsList" class="comps-list"></div>
         </div>
     </div>

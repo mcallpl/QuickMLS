@@ -104,19 +104,8 @@ try {
     // 4. Get comps within radius (default 1/8 mile, admin-adjustable)
     $radiusMiles = floatval($_POST['radius_miles'] ?? 0.10);
     if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.10;
-    $propertyType = $subject['PropertyType'] ?? null;
-    $comps = getComps($geo, $radiusMiles, $selectFields, $propertyType);
-
-    // If no subject was found, use the first comp as the reference type
-    // and filter out any comps that don't match its PropertyType
-    if (!$propertyType && !empty($comps)) {
-        $propertyType = $comps[0]['PropertyType'] ?? null;
-        if ($propertyType) {
-            $comps = array_values(array_filter($comps, function($c) use ($propertyType) {
-                return ($c['PropertyType'] ?? '') === $propertyType;
-            }));
-        }
-    }
+    // Get ALL comps — frontend handles type filtering via checkboxes
+    $comps = getComps($geo, $radiusMiles, $selectFields);
 
     // 5. Photos for subject + comps
     $allKeys = [];

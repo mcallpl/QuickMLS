@@ -28,6 +28,7 @@
     var currentRadius = 0.10;  // miles
     var radiusCircle  = null;   // Leaflet circle layer
     var radiusDebounce = null;  // debounce timer for re-fetch
+    var allCompsData  = [];     // unfiltered comps (master list)
 
     // ═══════════════════════════════════════════════════════════
     //  THEME TOGGLE
@@ -186,15 +187,17 @@
 
                 if (data.subject) {
                     heroData = data.subject;
-                    compsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
+                    allCompsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
                 } else if (data.comps && data.comps.length > 0) {
                     heroData = data.comps[0];
-                    compsData = data.comps.slice(1);
+                    allCompsData = data.comps.slice(1);
                 } else {
                     showNoResults('No MLS listings found for this address.');
                     return;
                 }
 
+                buildCompFilters();
+                applyCompFilters();
                 renderAll();
             })
             .catch(function(err) {
@@ -211,15 +214,17 @@
 
         if (data.subject) {
             heroData = data.subject;
-            compsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
+            allCompsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
         } else if (data.comps && data.comps.length > 0) {
             heroData = data.comps[0];
-            compsData = data.comps.slice(1);
+            allCompsData = data.comps.slice(1);
         } else {
             showNoResults('No MLS listings found for this address.');
             return;
         }
 
+        buildCompFilters();
+        applyCompFilters();
         renderAll();
     };
 
@@ -516,9 +521,12 @@
                     oldHero._distanceFt = Math.round(oldHero._distance * 5280);
                 }
 
+                // Swap hero into master list, remove clicked from master
+                allCompsData = allCompsData.filter(function(c) { return c.ListingKey !== clickedComp.ListingKey; });
+                allCompsData.push(oldHero);
                 heroData = clickedComp;
-                compsData[clickedIdx] = oldHero;
 
+                applyCompFilters();
                 renderAll();
             });
 
@@ -659,6 +667,99 @@
                     statusEl.className = 'send-status send-status-error';
                 });
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  COMP TYPE FILTERS (checkboxes)
+    // ═══════════════════════════════════════════════════════════
+
+    function buildCompFilters() {
+        var container = document.getElementById('compFilters');
+        if (!container) return;
+
+        // Determine hero's types
+        var heroType    = heroData.PropertyType || '';
+        var heroSubType = heroData.PropertySubType || '';
+
+        // Collect all unique PropertyTypes and SubTypes from comps + hero
+        var allProps = [heroData].concat(allCompsData);
+        var typeSet = {};
+        var subTypeSet = {};
+        allProps.forEach(function(p) {
+            var pt = p.PropertyType || '';
+            var pst = p.PropertySubType || '';
+            if (pt) typeSet[pt] = true;
+            if (pst) subTypeSet[pst] = true;
+        });
+
+        var types = Object.keys(typeSet).sort();
+        var subTypes = Object.keys(subTypeSet).sort();
+
+        // Build the filter UI
+        var html = '<div class="comp-filters-inner">';
+        html += '<span class="comp-filters-label">Show:</span>';
+
+        // PropertyType checkboxes (Sale vs Lease)
+        types.forEach(function(t) {
+            var checked = (t === heroType) ? ' checked' : '';
+            var label = formatFilterLabel(t);
+            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="type" value="' + escAttr(t) + '"' + checked + '><span>' + esc(label) + '</span></label>';
+        });
+
+        // Separator if both exist
+        if (types.length > 0 && subTypes.length > 0) {
+            html += '<span class="comp-filters-sep">|</span>';
+        }
+
+        // PropertySubType checkboxes (SFR, Condo, Townhouse, etc.)
+        subTypes.forEach(function(st) {
+            var checked = (st === heroSubType) ? ' checked' : '';
+            var label = formatFilterLabel(st);
+            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="subtype" value="' + escAttr(st) + '"' + checked + '><span>' + esc(label) + '</span></label>';
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+        container.classList.remove('hidden');
+
+        // Attach change listeners
+        container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                applyCompFilters();
+                renderAll();
+            });
+        });
+    }
+
+    function applyCompFilters() {
+        var container = document.getElementById('compFilters');
+        if (!container) { compsData = allCompsData.slice(); return; }
+
+        // Get checked types
+        var checkedTypes = [];
+        var checkedSubTypes = [];
+        container.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) {
+            checkedTypes.push(cb.value);
+        });
+        container.querySelectorAll('input[data-filter-type="subtype"]:checked').forEach(function(cb) {
+            checkedSubTypes.push(cb.value);
+        });
+
+        compsData = allCompsData.filter(function(c) {
+            var pt = c.PropertyType || '';
+            var pst = c.PropertySubType || '';
+            var typeOk = checkedTypes.length === 0 || checkedTypes.indexOf(pt) !== -1;
+            var subTypeOk = checkedSubTypes.length === 0 || checkedSubTypes.indexOf(pst) !== -1;
+            return typeOk && subTypeOk;
+        });
+    }
+
+    function formatFilterLabel(val) {
+        if (!val) return '';
+        // Split CamelCase and common patterns
+        return val.replace(/([a-z])([A-Z])/g, '$1 $2')
+                  .replace('Residential Lease', 'Lease')
+                  .replace('Residential Income', 'Income');
     }
 
     // ═══════════════════════════════════════════════════════════

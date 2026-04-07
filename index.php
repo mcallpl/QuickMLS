@@ -224,6 +224,8 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
                 </div>
             </div>
             <?php endif; ?>
+            <!-- Type Filters -->
+            <div id="compFilters" class="comp-filters hidden"></div>
             <div id="compsList" class="comps-list"></div>
         </div>
 

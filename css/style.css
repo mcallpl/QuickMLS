@@ -457,6 +457,33 @@ body {
     border: 1px solid var(--border); margin-bottom: 16px;
 }
 
+/* ── Comp Type Filters ────────────────────────────────── */
+.comp-filters {
+    margin-bottom: 14px; padding: 12px 16px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.comp-filters-inner {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+}
+.comp-filters-label {
+    font-size: 13px; font-weight: 600; color: var(--text-dim); margin-right: 4px;
+}
+.comp-filters-sep {
+    color: var(--border); font-size: 16px;
+}
+.comp-filter-cb {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--text); cursor: pointer;
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-card2);
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+.comp-filter-cb:hover { border-color: var(--accent); }
+.comp-filter-cb input { cursor: pointer; accent-color: var(--accent); }
+.comp-filter-cb input:checked + span { color: var(--accent); font-weight: 600; }
+
 /* ── Comp Cards ───────────────────────────────────────── */
 .comps-list {
     display: grid;
