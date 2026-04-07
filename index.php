@@ -246,22 +246,19 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             <h3>Send To Client</h3>
             <button type="button" id="sendModalClose" class="modal-close">&times;</button>
         </div>
-        <p class="modal-desc">Send a shareable link for this property to your client via text message. The link will show property details with your contact info only.</p>
-        <form id="sendForm" class="send-form">
-            <label for="clientSearch">Search Contact</label>
-            <div class="contact-search-wrap">
-                <input type="text" id="clientSearch" placeholder="Start typing a name..." autocomplete="off">
-                <div id="contactResults" class="contact-results hidden"></div>
-            </div>
-            <label for="clientPhone">Phone Number</label>
-            <input type="text" id="clientPhone" placeholder="(555) 123-4567 or multiple separated by commas" required>
+        <p class="modal-desc">Generate a shareable link for this property. The link shows property details with your contact info only — no search, no other agents.</p>
+        <div id="sendForm">
             <div id="sendStatus" class="send-status hidden"></div>
-            <button type="submit" class="send-submit-btn">&#128233; Send via Text</button>
-        </form>
+            <button type="button" id="generateLinkBtn" class="send-submit-btn">Generate Link</button>
+        </div>
         <div id="sendResult" class="send-result hidden">
             <div class="send-result-icon">&#9989;</div>
-            <p>Link sent successfully!</p>
+            <p>Link ready!</p>
             <div id="sendResultUrl" class="send-result-url"></div>
+            <div class="send-actions">
+                <button type="button" id="copyLinkBtn" class="send-action-btn">&#128203; Copy Link</button>
+                <button type="button" id="shareLinkBtn" class="send-action-btn send-action-share">&#128228; Share</button>
+            </div>
         </div>
     </div>
 </div>

@@ -683,6 +683,20 @@ body {
     border-radius: var(--radius-sm); padding: 10px;
     user-select: all;
 }
+.send-actions {
+    display: flex; gap: 10px; margin-top: 14px; justify-content: center;
+}
+.send-action-btn {
+    background: var(--accent); color: #000; border: none;
+    font-weight: 700; font-size: 14px; padding: 10px 20px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    transition: opacity 0.15s;
+}
+.send-action-btn:hover { opacity: 0.85; }
+[data-theme="light"] .send-action-btn { color: #fff; }
+.send-action-share {
+    background: var(--green); color: #fff;
+}
 
 /* ═══════════════════════════════════════════════════════
    CLIENT VIEW — Agent Footer

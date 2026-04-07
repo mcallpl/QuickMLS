@@ -608,14 +608,13 @@
     var sendModal = document.getElementById('sendModal');
     var sendClose = document.getElementById('sendModalClose');
     var sendForm  = document.getElementById('sendForm');
+    var generatedShareUrl = '';
 
     if (sendBtn && sendModal) {
         sendBtn.addEventListener('click', function() {
-            // Reset modal state
             document.getElementById('sendStatus').classList.add('hidden');
             document.getElementById('sendResult').classList.add('hidden');
             sendForm.classList.remove('hidden');
-            document.getElementById('clientPhone').value = '';
             sendModal.classList.remove('hidden');
         });
 
@@ -627,70 +626,12 @@
             if (e.target === sendModal) sendModal.classList.add('hidden');
         });
 
-        // ── Contact autocomplete ──
-        var clientSearch = document.getElementById('clientSearch');
-        var contactResults = document.getElementById('contactResults');
-        var contactDebounce = null;
-
-        if (clientSearch) {
-            clientSearch.addEventListener('input', function() {
-                var q = this.value.trim();
-                if (q.length < 2) { contactResults.classList.add('hidden'); return; }
-
-                clearTimeout(contactDebounce);
-                contactDebounce = setTimeout(function() {
-                    fetch('api/contacts.php?q=' + encodeURIComponent(q))
-                        .then(function(r) { return r.json(); })
-                        .then(function(d) {
-                            var contacts = d.contacts || [];
-                            if (contacts.length === 0) {
-                                contactResults.innerHTML = '<div class="contact-item contact-none">No contacts found</div>';
-                            } else {
-                                contactResults.innerHTML = contacts.map(function(c) {
-                                    return '<div class="contact-item" data-phone="' + escAttr(c.phone) + '">'
-                                        + '<span class="contact-name">' + esc(c.name) + '</span>'
-                                        + '<span class="contact-phone">' + esc(c.phone) + '</span>'
-                                        + '</div>';
-                                }).join('');
-                            }
-                            contactResults.classList.remove('hidden');
-
-                            // Click to select — append with comma if phone field already has a number
-                            contactResults.querySelectorAll('.contact-item[data-phone]').forEach(function(el) {
-                                el.addEventListener('click', function() {
-                                    var phoneInput = document.getElementById('clientPhone');
-                                    var existing = phoneInput.value.trim();
-                                    if (existing && !existing.endsWith(',')) {
-                                        phoneInput.value = existing + ', ' + this.dataset.phone;
-                                    } else {
-                                        phoneInput.value = (existing ? existing + ' ' : '') + this.dataset.phone;
-                                    }
-                                    clientSearch.value = '';
-                                    contactResults.classList.add('hidden');
-                                    clientSearch.focus();
-                                });
-                            });
-                        });
-                }, 250);
-            });
-
-            // Hide results on blur (delayed so click can register)
-            clientSearch.addEventListener('blur', function() {
-                setTimeout(function() { contactResults.classList.add('hidden'); }, 200);
-            });
-        }
-
-        sendForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            var phone = document.getElementById('clientPhone').value.trim();
-            if (!phone) return;
-
+        // Generate link
+        document.getElementById('generateLinkBtn').addEventListener('click', function() {
             var statusEl = document.getElementById('sendStatus');
-            statusEl.textContent = 'Sending...';
+            statusEl.textContent = 'Generating link...';
             statusEl.className = 'send-status';
 
-            // Use the CURRENT hero's address, not the search bar
             var heroAddr = '';
             if (heroData) {
                 heroAddr = [heroData.StreetNumber, heroData.StreetDirPrefix, heroData.StreetName, heroData.StreetSuffix, heroData.StreetDirSuffix].filter(Boolean).join(' ');
@@ -702,36 +643,48 @@
             fd.append('address', heroAddr || (appData && appData.address) || '');
             fd.append('hero_listing_key', heroData ? (heroData.ListingKey || '') : '');
             fd.append('radius_miles', currentRadius);
-            fd.append('client_phone', phone);
 
             fetch('api/share.php', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     if (d.success) {
+                        generatedShareUrl = d.share_url;
                         sendForm.classList.add('hidden');
-                        var resultEl = document.getElementById('sendResult');
                         document.getElementById('sendResultUrl').textContent = d.share_url;
-                        // Update success message based on count
-                        var msgEl = resultEl.querySelector('p');
-                        if (d.total > 1) {
-                            msgEl.textContent = 'Link sent to ' + d.sms_sent + ' of ' + d.total + ' recipients!';
-                        } else {
-                            msgEl.textContent = 'Link sent successfully!';
-                        }
-                        resultEl.classList.remove('hidden');
-                        if (d.sms_sent === 0) {
-                            statusEl.textContent = 'Link created but SMS could not be sent. Copy the link below:';
-                            statusEl.className = 'send-status send-status-warn';
-                        }
+                        document.getElementById('sendResult').classList.remove('hidden');
+                        // Hide share button if Web Share API not supported
+                        var shareBtn = document.getElementById('shareLinkBtn');
+                        if (shareBtn && !navigator.share) shareBtn.classList.add('hidden');
                     } else {
                         statusEl.textContent = d.error || 'Failed to create link';
                         statusEl.className = 'send-status send-status-error';
                     }
                 })
                 .catch(function(err) {
-                    statusEl.textContent = 'Network error: ' + err.message;
+                    statusEl.textContent = 'Error: ' + err.message;
                     statusEl.className = 'send-status send-status-error';
                 });
+        });
+
+        // Copy link
+        document.getElementById('copyLinkBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(generatedShareUrl).then(function() {
+                var btn = document.getElementById('copyLinkBtn');
+                btn.textContent = 'Copied!';
+                setTimeout(function() { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+            });
+        });
+
+        // Native share (mobile)
+        document.getElementById('shareLinkBtn').addEventListener('click', function() {
+            if (navigator.share) {
+                var heroAddr = heroData ? [heroData.StreetNumber, heroData.StreetName].filter(Boolean).join(' ') : 'Property';
+                navigator.share({
+                    title: heroAddr + ' — Property Details',
+                    text: 'Check out this property:',
+                    url: generatedShareUrl,
+                });
+            }
         });
     }
 
