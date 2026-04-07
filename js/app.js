@@ -65,17 +65,18 @@
         // Sync slider to current radius
         radiusSlider.value = currentRadius;
         radiusLabel.textContent = formatRadius(currentRadius);
+        highlightActiveTick(currentRadius);
 
         radiusSlider.addEventListener('input', function() {
             currentRadius = parseFloat(this.value);
             radiusLabel.textContent = formatRadius(currentRadius);
             updateRadiusDisplay();
+            highlightActiveTick(currentRadius);
 
             // Instantly resize the circle on the map
             if (radiusCircle) {
                 radiusCircle.setRadius(currentRadius * 1609.34);
             }
-            // Adjust zoom to fit
             if (map) {
                 map.setZoom(getZoomForRadius(currentRadius));
             }
@@ -87,6 +88,24 @@
                     doSearch(appData.address, currentRadius);
                 }
             }, 400);
+        });
+
+        // Make tick labels clickable
+        var ticks = document.querySelectorAll('.radius-ticks span');
+        ticks.forEach(function(tick) {
+            tick.addEventListener('click', function() {
+                var val = parseFloat(this.getAttribute('data-val'));
+                radiusSlider.value = val;
+                radiusSlider.dispatchEvent(new Event('input'));
+            });
+        });
+    }
+
+    function highlightActiveTick(val) {
+        var ticks = document.querySelectorAll('.radius-ticks span');
+        ticks.forEach(function(t) {
+            var tickVal = parseFloat(t.getAttribute('data-val'));
+            t.classList.toggle('active', Math.abs(tickVal - val) < 0.01);
         });
     }
 

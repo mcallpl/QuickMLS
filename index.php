@@ -194,31 +194,34 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             <div id="map" class="map-container"></div>
             <?php if ($isAdmin): ?>
             <div class="radius-control">
-                <label for="radiusSlider">Comp Radius:</label>
-                <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.05" value="0.10" list="radiusTicks">
-                <datalist id="radiusTicks">
-                    <option value="0.05" label=".05"></option>
-                    <option value="0.10" label=".10"></option>
-                    <option value="0.15" label=".15"></option>
-                    <option value="0.20" label=".20"></option>
-                    <option value="0.25" label=".25"></option>
-                    <option value="0.30" label=".30"></option>
-                    <option value="0.35" label=".35"></option>
-                    <option value="0.40" label=".40"></option>
-                    <option value="0.45" label=".45"></option>
-                    <option value="0.50" label=".50"></option>
-                    <option value="0.55" label=".55"></option>
-                    <option value="0.60" label=".60"></option>
-                    <option value="0.65" label=".65"></option>
-                    <option value="0.70" label=".70"></option>
-                    <option value="0.75" label=".75"></option>
-                    <option value="0.80" label=".80"></option>
-                    <option value="0.85" label=".85"></option>
-                    <option value="0.90" label=".90"></option>
-                    <option value="0.95" label=".95"></option>
-                    <option value="1.00" label="1.0"></option>
-                </datalist>
-                <span id="radiusLabel">0.10 mi</span>
+                <div class="radius-header">
+                    <label>Comp Radius: <span id="radiusLabel">0.10 mi</span></label>
+                </div>
+                <div class="radius-slider-wrap">
+                    <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.05" value="0.10">
+                    <div class="radius-ticks">
+                        <span data-val="0.05">.05</span>
+                        <span data-val="0.10">.10</span>
+                        <span data-val="0.15">.15</span>
+                        <span data-val="0.20">.20</span>
+                        <span data-val="0.25">.25</span>
+                        <span data-val="0.30">.30</span>
+                        <span data-val="0.35">.35</span>
+                        <span data-val="0.40">.40</span>
+                        <span data-val="0.45">.45</span>
+                        <span data-val="0.50">.50</span>
+                        <span data-val="0.55">.55</span>
+                        <span data-val="0.60">.60</span>
+                        <span data-val="0.65">.65</span>
+                        <span data-val="0.70">.70</span>
+                        <span data-val="0.75">.75</span>
+                        <span data-val="0.80">.80</span>
+                        <span data-val="0.85">.85</span>
+                        <span data-val="0.90">.90</span>
+                        <span data-val="0.95">.95</span>
+                        <span data-val="1.00">1.0</span>
+                    </div>
+                </div>
             </div>
             <?php endif; ?>
             <div id="compsList" class="comps-list"></div>
