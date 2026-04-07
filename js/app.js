@@ -203,10 +203,24 @@
             });
     }
 
-    // Expose for client mode auto-search
-    window.autoClientSearch = function(addr, radius) {
-        currentRadius = radius;
-        doSearch(addr, radius);
+    // Expose for client mode — load pre-fetched data directly (no API call)
+    window.loadPreloadedData = function(data) {
+        hideLoader();
+        appData = data;
+        currentRadius = data.radius_miles || currentRadius;
+
+        if (data.subject) {
+            heroData = data.subject;
+            compsData = (data.comps || []).filter(function(c) { return c.ListingKey !== data.subject.ListingKey; });
+        } else if (data.comps && data.comps.length > 0) {
+            heroData = data.comps[0];
+            compsData = data.comps.slice(1);
+        } else {
+            showNoResults('No MLS listings found for this address.');
+            return;
+        }
+
+        renderAll();
     };
 
     // ── Render everything ──

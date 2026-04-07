@@ -2,10 +2,15 @@
 /**
  * QuickMLS — Client View (Shared Property Page)
  * No search, no admin controls, only Chip & Kim agent info
+ * Performs search SERVER-SIDE so no auth is needed on the client.
  */
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/db.php';
+require_once __DIR__ . '/lib/auth.php';
+require_once __DIR__ . '/lib/api.php';
+require_once __DIR__ . '/lib/geocode.php';
+require_once __DIR__ . '/lib/photos.php';
 
 $token = trim($_GET['t'] ?? '');
 if (!$token) { http_response_code(404); echo 'Invalid link.'; exit; }
@@ -21,7 +26,88 @@ $stmt->close();
 if (!$share) { http_response_code(404); echo 'This link has expired or is invalid.'; exit; }
 
 $shareAddress = $share['address'];
-$shareRadius  = $share['radius_miles'];
+$shareRadius  = (float)$share['radius_miles'];
+
+// ── Do the search server-side ──
+$searchData = null;
+try {
+    // Reuse the same search logic from api/search.php
+    $selectFields = implode(',', [
+        'ListingKey','ListingId','StandardStatus',
+        'ListPrice','OriginalListPrice','ClosePrice','CloseDate',
+        'StreetNumber','StreetName','StreetSuffix','StreetDirPrefix','StreetDirSuffix',
+        'UnitNumber','City','StateOrProvince','PostalCode','CountyOrParish',
+        'Latitude','Longitude',
+        'BedroomsTotal','BathroomsTotalInteger','BathroomsFull','BathroomsHalf',
+        'LivingArea','LotSizeAcres','LotSizeSquareFeet','YearBuilt','GarageSpaces',
+        'StoriesTotal','Flooring','Heating','Cooling','Roof','PoolPrivateYN',
+        'PropertyType','PropertySubType',
+        'PublicRemarks','SyndicationRemarks',
+        'Appliances','InteriorFeatures','ExteriorFeatures',
+        'ParkingFeatures','LaundryFeatures','FireplaceFeatures',
+        'WaterSource','Sewer','Electric',
+        'FoundationDetails','ArchitecturalStyle','BuildingAreaTotal',
+        'CommonWalls','ConstructionMaterials','DirectionFaces',
+        'PatioAndPorchFeatures','SecurityFeatures','View',
+        'WindowFeatures','Fencing',
+        'AssociationFee','AssociationFeeFrequency',
+        'DaysOnMarket','CumulativeDaysOnMarket','ModificationTimestamp','ListingContractDate',
+        'TaxAnnualAmount','TaxAssessedValue',
+    ]);
+
+    require_once __DIR__ . '/api/search_helpers.php';
+
+    $addrParts = parseAddressString($shareAddress);
+    $geo = geocodeAddress($shareAddress);
+
+    if ($geo) {
+        $subject = findSubjectProperty($addrParts, $geo, $selectFields);
+        $propertyType = $subject['PropertyType'] ?? null;
+        $comps = getComps($geo, $shareRadius, $selectFields, $propertyType);
+
+        // Photos
+        $allKeys = [];
+        if ($subject) $allKeys[] = $subject['ListingKey'];
+        foreach ($comps as $c) $allKeys[] = $c['ListingKey'];
+        $allKeys = array_unique(array_filter($allKeys));
+        $photos = batchGetAllPhotos($allKeys);
+
+        $photoBaseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+            . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+            . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/api/photo.php?url=';
+
+        if ($subject) {
+            $rawPhotos = $photos[$subject['ListingKey']] ?? [];
+            $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
+            $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
+        }
+        foreach ($comps as &$comp) {
+            $rawPhotos = $photos[$comp['ListingKey'] ?? ''] ?? [];
+            $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
+            $comp['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
+            $cLat = (float)($comp['Latitude'] ?? 0);
+            $cLng = (float)($comp['Longitude'] ?? 0);
+            if ($cLat && $cLng) {
+                $comp['_distance'] = haversineDistance($geo['lat'], $geo['lng'], $cLat, $cLng);
+                $comp['_distanceFt'] = round($comp['_distance'] * 5280);
+            }
+        }
+        unset($comp);
+        usort($comps, fn($a, $b) => ($a['_distance'] ?? 999) <=> ($b['_distance'] ?? 999));
+
+        $searchData = [
+            'success'      => true,
+            'geocoded'     => $geo,
+            'subject'      => $subject,
+            'comps'        => $comps,
+            'compCount'    => count($comps),
+            'address'      => $shareAddress,
+            'radius_miles' => $shareRadius,
+        ];
+    }
+} catch (Exception $e) {
+    // Search failed — page will show error
+}
 
 $v = time();
 ?>
@@ -45,7 +131,6 @@ $v = time();
 
 <div class="app">
 
-    <!-- HEADER (client view — no search) -->
     <header class="header">
         <div class="header-brand">
             <span class="header-icon">&#9889;</span>
@@ -53,7 +138,6 @@ $v = time();
         </div>
         <p class="header-tagline">Property details prepared for you by <?= htmlspecialchars(TEAM_NAME) ?></p>
 
-        <!-- Theme toggle -->
         <div class="theme-toggle-wrap">
             <label class="theme-toggle" title="Toggle light/dark mode">
                 <input type="checkbox" id="themeToggle">
@@ -65,9 +149,7 @@ $v = time();
         </div>
     </header>
 
-    <!-- RESULTS CONTAINER -->
     <div id="results" class="results hidden">
-
         <div id="heroSection" class="hero-section">
             <div class="hero-carousel-wrap">
                 <div id="heroCarousel" class="hero-carousel"></div>
@@ -76,7 +158,6 @@ $v = time();
                 <div id="carouselCounter" class="carousel-counter">1 / 1</div>
                 <div id="heroStatusBadge" class="hero-status-badge">Active</div>
             </div>
-
             <div class="hero-body">
                 <div class="hero-address-row">
                     <div>
@@ -88,7 +169,6 @@ $v = time();
                         <div id="heroPriceSqft" class="hero-price-sqft"></div>
                     </div>
                 </div>
-
                 <div class="hero-stats-bar">
                     <div class="hero-stat"><span id="heroBeds">—</span><small>Beds</small></div>
                     <div class="hero-stat"><span id="heroBaths">—</span><small>Baths</small></div>
@@ -99,16 +179,13 @@ $v = time();
                     <div class="hero-stat"><span id="heroStories">—</span><small>Stories</small></div>
                     <div class="hero-stat"><span id="heroDom">—</span><small>DOM</small></div>
                 </div>
-
                 <div id="heroTags" class="hero-tags"></div>
                 <div id="heroAgents" class="hero-agents"></div>
                 <div id="heroDetailsGrid" class="hero-details-grid"></div>
-
                 <div id="heroPublicRemarks" class="hero-remarks hidden">
                     <h4>Public Remarks</h4>
                     <p id="heroPublicRemarksText"></p>
                 </div>
-
                 <div id="heroMeta" class="hero-meta"></div>
             </div>
         </div>
@@ -121,16 +198,13 @@ $v = time();
             <div id="map" class="map-container"></div>
             <div id="compsList" class="comps-list"></div>
         </div>
-
     </div>
 
-    <!-- NO RESULTS -->
     <div id="noResults" class="no-results hidden">
         <div class="no-results-icon">&#128270;</div>
         <p id="noResultsMsg">No MLS listing found for this address.</p>
     </div>
 
-    <!-- Agent Footer -->
     <div class="client-agent-footer">
         <div class="client-agent-card">
             <div class="client-agent-name"><?= htmlspecialchars(AGENT_NAME) ?></div>
@@ -155,17 +229,19 @@ $v = time();
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/app.js?v=<?=$v?>"></script>
 <script>
-// Client mode — auto-search with locked settings, no other agent info
+// Client mode — data is pre-loaded server-side, no API call needed
 var CLIENT_MODE = true;
-var SHARE_TOKEN = <?= json_encode($token) ?>;
-var SHARE_ADDRESS = <?= json_encode($shareAddress) ?>;
-var SHARE_RADIUS = <?= json_encode((float)$shareRadius) ?>;
+var PRELOADED_DATA = <?= json_encode($searchData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 var GOOGLE_MAPS_KEY = <?= json_encode(GOOGLE_MAPS_API_KEY) ?>;
 
-// Auto-trigger search on load
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('addressInput')?.remove();
-    window.autoClientSearch && window.autoClientSearch(SHARE_ADDRESS, SHARE_RADIUS);
+    if (PRELOADED_DATA && PRELOADED_DATA.success) {
+        window.loadPreloadedData && window.loadPreloadedData(PRELOADED_DATA);
+    } else {
+        document.getElementById('loader').classList.add('hidden');
+        document.getElementById('noResultsMsg').textContent = 'Could not load property data.';
+        document.getElementById('noResults').classList.remove('hidden');
+    }
 });
 </script>
 <script
