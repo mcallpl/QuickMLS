@@ -33,18 +33,30 @@ if (!$clientPhone) {
     exit;
 }
 
-// Clean phone to digits only, add +1 if needed
-$phoneDigits = preg_replace('/\D/', '', $clientPhone);
-if (strlen($phoneDigits) === 10) $phoneDigits = '1' . $phoneDigits;
-$phoneFull = '+' . $phoneDigits;
+// Parse multiple phone numbers (comma-separated)
+$rawPhones = array_filter(array_map('trim', explode(',', $clientPhone)));
+$phoneNumbers = [];
+foreach ($rawPhones as $ph) {
+    $digits = preg_replace('/\D/', '', $ph);
+    if (strlen($digits) === 10) $digits = '1' . $digits;
+    if (strlen($digits) >= 10) {
+        $phoneNumbers[] = '+' . $digits;
+    }
+}
 
-// Generate share token
+if (empty($phoneNumbers)) {
+    echo json_encode(['success' => false, 'error' => 'No valid phone numbers found']);
+    exit;
+}
+
+// Generate share token (one link for all recipients)
 $token = bin2hex(random_bytes(16));
+$allPhones = implode(',', $phoneNumbers);
 
 // Save to database
 $db   = getDb();
 $stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, created_by, client_phone) VALUES (?, ?, ?, ?, ?, ?)");
-$stmt->bind_param('sssdis', $token, $address, $heroListingKey, $radiusMiles, $_SESSION['user_id'], $phoneFull);
+$stmt->bind_param('sssdis', $token, $address, $heroListingKey, $radiusMiles, $_SESSION['user_id'], $allPhones);
 $stmt->execute();
 $stmt->close();
 
@@ -60,19 +72,27 @@ if (REBRANDLY_API_KEY) {
     $shortUrl = rebrandlyShorten($longUrl) ?: $longUrl;
 }
 
-// Send via Twilio SMS
-$smsResult = null;
+// Send via Twilio SMS to each number
+$smsSent = 0;
+$smsFailed = 0;
 if (TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
     $message = "Here's the property info you requested: $shortUrl\n— " . TEAM_NAME;
-    $smsResult = sendTwilioSms($phoneFull, $message);
+    foreach ($phoneNumbers as $phone) {
+        if (sendTwilioSms($phone, $message)) {
+            $smsSent++;
+        } else {
+            $smsFailed++;
+        }
+    }
 }
 
 echo json_encode([
-    'success'   => true,
-    'token'     => $token,
-    'share_url' => $shortUrl,
-    'sms_sent'  => $smsResult ? true : false,
-    'sms_error' => $smsResult === false ? 'SMS send failed' : null,
+    'success'    => true,
+    'token'      => $token,
+    'share_url'  => $shortUrl,
+    'sms_sent'   => $smsSent,
+    'sms_failed' => $smsFailed,
+    'total'      => count($phoneNumbers),
 ]);
 
 // ── Rebrandly URL shortener ──

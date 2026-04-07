@@ -254,7 +254,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
                 <div id="contactResults" class="contact-results hidden"></div>
             </div>
             <label for="clientPhone">Phone Number</label>
-            <input type="tel" id="clientPhone" placeholder="(555) 123-4567" required>
+            <input type="text" id="clientPhone" placeholder="(555) 123-4567 or multiple separated by commas" required>
             <div id="sendStatus" class="send-status hidden"></div>
             <button type="submit" class="send-submit-btn">&#128233; Send via Text</button>
         </form>

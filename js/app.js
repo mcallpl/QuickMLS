@@ -655,12 +655,19 @@
                             }
                             contactResults.classList.remove('hidden');
 
-                            // Click to select
+                            // Click to select — append with comma if phone field already has a number
                             contactResults.querySelectorAll('.contact-item[data-phone]').forEach(function(el) {
                                 el.addEventListener('click', function() {
-                                    document.getElementById('clientPhone').value = this.dataset.phone;
-                                    clientSearch.value = this.querySelector('.contact-name').textContent;
+                                    var phoneInput = document.getElementById('clientPhone');
+                                    var existing = phoneInput.value.trim();
+                                    if (existing && !existing.endsWith(',')) {
+                                        phoneInput.value = existing + ', ' + this.dataset.phone;
+                                    } else {
+                                        phoneInput.value = (existing ? existing + ' ' : '') + this.dataset.phone;
+                                    }
+                                    clientSearch.value = '';
                                     contactResults.classList.add('hidden');
+                                    clientSearch.focus();
                                 });
                             });
                         });
@@ -704,8 +711,15 @@
                         sendForm.classList.add('hidden');
                         var resultEl = document.getElementById('sendResult');
                         document.getElementById('sendResultUrl').textContent = d.share_url;
+                        // Update success message based on count
+                        var msgEl = resultEl.querySelector('p');
+                        if (d.total > 1) {
+                            msgEl.textContent = 'Link sent to ' + d.sms_sent + ' of ' + d.total + ' recipients!';
+                        } else {
+                            msgEl.textContent = 'Link sent successfully!';
+                        }
                         resultEl.classList.remove('hidden');
-                        if (!d.sms_sent) {
+                        if (d.sms_sent === 0) {
                             statusEl.textContent = 'Link created but SMS could not be sent. Copy the link below:';
                             statusEl.className = 'send-status send-status-warn';
                         }
