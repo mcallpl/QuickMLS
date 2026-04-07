@@ -195,8 +195,30 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             <?php if ($isAdmin): ?>
             <div class="radius-control">
                 <label for="radiusSlider">Comp Radius:</label>
-                <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.025" value="0.125">
-                <span id="radiusLabel">1/8 mi</span>
+                <input type="range" id="radiusSlider" min="0.05" max="1.0" step="0.05" value="0.10" list="radiusTicks">
+                <datalist id="radiusTicks">
+                    <option value="0.05" label=".05"></option>
+                    <option value="0.10" label=".10"></option>
+                    <option value="0.15" label=".15"></option>
+                    <option value="0.20" label=".20"></option>
+                    <option value="0.25" label=".25"></option>
+                    <option value="0.30" label=".30"></option>
+                    <option value="0.35" label=".35"></option>
+                    <option value="0.40" label=".40"></option>
+                    <option value="0.45" label=".45"></option>
+                    <option value="0.50" label=".50"></option>
+                    <option value="0.55" label=".55"></option>
+                    <option value="0.60" label=".60"></option>
+                    <option value="0.65" label=".65"></option>
+                    <option value="0.70" label=".70"></option>
+                    <option value="0.75" label=".75"></option>
+                    <option value="0.80" label=".80"></option>
+                    <option value="0.85" label=".85"></option>
+                    <option value="0.90" label=".90"></option>
+                    <option value="0.95" label=".95"></option>
+                    <option value="1.00" label="1.0"></option>
+                </datalist>
+                <span id="radiusLabel">0.10 mi</span>
             </div>
             <?php endif; ?>
             <div id="compsList" class="comps-list"></div>

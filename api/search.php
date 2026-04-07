@@ -101,8 +101,8 @@ try {
     $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
     // 4. Get comps within radius (default 1/8 mile, admin-adjustable)
-    $radiusMiles = floatval($_POST['radius_miles'] ?? 0.125);
-    if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.125;
+    $radiusMiles = floatval($_POST['radius_miles'] ?? 0.10);
+    if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.10;
     $propertyType = $subject['PropertyType'] ?? null;
     $comps = getComps($geo, $radiusMiles, $selectFields, $propertyType);
 

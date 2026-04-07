@@ -25,7 +25,7 @@
     var carouselIdx = 0;
     var map         = null;
     var markers     = [];
-    var currentRadius = 0.125;  // miles
+    var currentRadius = 0.10;  // miles
     var radiusCircle  = null;   // Leaflet circle layer
     var radiusDebounce = null;  // debounce timer for re-fetch
 
@@ -91,10 +91,7 @@
     }
 
     function formatRadius(miles) {
-        if (Math.abs(miles - 0.125) < 0.01) return '1/8 mi';
-        if (Math.abs(miles - 0.25) < 0.01)  return '1/4 mi';
-        if (Math.abs(miles - 0.5) < 0.01)   return '1/2 mi';
-        if (Math.abs(miles - 1.0) < 0.01)   return '1 mi';
+        if (Math.abs(miles - 1.0) < 0.01) return '1.0 mi';
         return miles.toFixed(2) + ' mi';
     }
 

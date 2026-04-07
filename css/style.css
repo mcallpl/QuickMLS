@@ -191,6 +191,13 @@ body {
     font-size: 14px; font-weight: 700; color: var(--accent);
     min-width: 52px;
 }
+#radiusTicks {
+    display: flex; justify-content: space-between;
+    padding: 0;
+}
+#radiusTicks option {
+    font-size: 10px; color: var(--text-dim);
+}
 
 /* ── SEND TO CLIENT ──────────────────────────────────────── */
 .send-client-bar {
