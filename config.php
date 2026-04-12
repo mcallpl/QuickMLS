@@ -23,11 +23,6 @@ if (!defined('DB_USER')) define('DB_USER', 'root');
 if (!defined('DB_PASS')) define('DB_PASS', '');
 if (!defined('DB_NAME')) define('DB_NAME', 'quickmls');
 
-// Twilio defaults
-if (!defined('TWILIO_SID'))   define('TWILIO_SID',   '');
-if (!defined('TWILIO_TOKEN')) define('TWILIO_TOKEN', '');
-if (!defined('TWILIO_PHONE')) define('TWILIO_PHONE', '');
-
 // Rebrandly (optional — falls back to direct link)
 if (!defined('REBRANDLY_API_KEY')) define('REBRANDLY_API_KEY', '');
 if (!defined('REBRANDLY_DOMAIN'))  define('REBRANDLY_DOMAIN',  'rebrand.ly');
