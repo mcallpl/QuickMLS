@@ -43,4 +43,4 @@ define('AGENT2_PHONE',      '(949) 735-9416');
 
 // ── Team / Branding ──────────────────────────────────────
 define('TEAM_NAME',         'Chip & Kim McAllister');
-define('TEAM_OFFICE',       'HomeSmart, Evergreen Realty');
+define('TEAM_OFFICE',       'First Team Real Estate');

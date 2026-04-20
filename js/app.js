@@ -308,7 +308,6 @@
 
             document.getElementById('heroAgents').innerHTML =
                 '<div class="off-market-panel">'
-              + '<div class="omp-icon">&#127968;</div>'
               + '<h3 class="omp-title">This Property Is Not Currently Listed</h3>'
               + '<p class="omp-message">MLS data is unavailable for this address. For a comprehensive property report — including ownership history, valuation analysis, and neighborhood market data — contact Chip McAllister directly.</p>'
               + '<a href="mailto:Chip@chipandkim.com?subject=' + subject + '&body=' + body + '" class="omp-cta">Request a Property Report</a>'
@@ -316,7 +315,7 @@
               + '<a href="tel:9497359415" class="omp-contact-link">&#128222;&ensp;(949) 735-9415</a>'
               + '<a href="mailto:Chip@chipandkim.com" class="omp-contact-link">&#9993;&ensp;Chip@chipandkim.com</a>'
               + '</div>'
-              + '<div class="omp-agent-line">Chip McAllister &middot; Broker Associate &middot; DRE #01971252 &middot; HomeSmart, Evergreen Realty</div>'
+              + '<div class="omp-agent-line">Chip McAllister &middot; Broker Associate &middot; DRE #01971252 &middot; First Team Real Estate</div>'
               + '</div>';
 
             document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
