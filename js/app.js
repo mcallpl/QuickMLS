@@ -819,7 +819,7 @@
     }
 
     function formatStatus(s) {
-        var m = { 'Active':'Active','Pending':'Pending','Closed':'Closed','ActiveUnderContract':'Under Contract','ComingSoon':'Coming Soon','Canceled':'Canceled','Expired':'Expired' };
+        var m = { 'Active':'Active','Pending':'Pending','Closed':'Closed','ActiveUnderContract':'Under Contract','ComingSoon':'Coming Soon','Canceled':'Canceled','Expired':'Expired','NotInMLS':'Off Market' };
         return m[s] || s;
     }
     function statusClass(s) {
@@ -827,6 +827,7 @@
         if (s === 'Pending') return 'pending';
         if (s === 'Closed') return 'closed';
         if (s === 'ActiveUnderContract') return 'contract';
+        if (s === 'NotInMLS') return 'off-market';
         return '';
     }
     function statusMarkerColor(s) {

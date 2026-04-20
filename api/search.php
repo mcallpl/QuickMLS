@@ -101,6 +101,24 @@ try {
     // 3. Find the subject property — exact address match in MLS
     $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
+    // 3b. Not in MLS — build a synthetic subject from the geocoded address
+    //     so the searched property is always the hero, not a nearby active listing.
+    if (!$subject) {
+        $subject = [
+            'StreetNumber'    => $addrParts['number'],
+            'StreetName'      => $addrParts['street'],
+            'StreetSuffix'    => '',
+            'City'            => $addrParts['city'] ?: ($geo['city'] ?? ''),
+            'StateOrProvince' => $addrParts['state'] ?: ($geo['state'] ?? ''),
+            'PostalCode'      => $addrParts['zip'] ?: ($geo['postcode'] ?? ''),
+            'Latitude'        => $geo['lat'],
+            'Longitude'       => $geo['lng'],
+            'StandardStatus'  => 'NotInMLS',
+            '_photos'         => [],
+            '_not_in_mls'     => true,
+        ];
+    }
+
     // 4. Get comps within radius (default 1/8 mile, admin-adjustable)
     $radiusMiles = floatval($_POST['radius_miles'] ?? 0.10);
     if ($radiusMiles < 0.05 || $radiusMiles > 2.0) $radiusMiles = 0.10;
@@ -118,8 +136,8 @@ try {
         . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
         . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/photo.php?url=';
 
-    // Attach photos to subject
-    if ($subject) {
+    // Attach photos to subject (synthetic subjects have no ListingKey — skip)
+    if ($subject && !($subject['_not_in_mls'] ?? false)) {
         $rawPhotos = $photos[$subject['ListingKey']] ?? [];
         $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
         $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
