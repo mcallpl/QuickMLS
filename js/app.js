@@ -280,6 +280,47 @@
         document.getElementById('heroAddress').textContent = street + unit;
         document.getElementById('heroCityLine').textContent = [p.City, p.StateOrProvince, p.PostalCode, p.CountyOrParish ? p.CountyOrParish + ' County' : ''].filter(Boolean).join(', ');
 
+        // ── Off-Market: hide blank fields, show contact panel ──
+        var statsBar    = document.querySelector('.hero-stats-bar');
+        var priceBlock  = document.querySelector('.hero-price-block');
+        var isOffMarket = !!(p._not_in_mls);
+
+        if (isOffMarket) {
+            if (priceBlock)  priceBlock.classList.add('hidden');
+            if (statsBar)    statsBar.classList.add('hidden');
+            document.getElementById('heroTags').innerHTML        = '';
+            document.getElementById('heroDetailsGrid').innerHTML  = '';
+            document.getElementById('heroMeta').innerHTML         = '';
+            document.getElementById('heroPublicRemarks').classList.add('hidden');
+            var privEl = document.getElementById('heroPrivateRemarks');
+            if (privEl) privEl.classList.add('hidden');
+
+            var fullAddr = [p.StreetNumber, p.StreetName, p.StreetSuffix].filter(Boolean).join(' ')
+                + (p.City ? ', ' + p.City : '') + (p.StateOrProvince ? ', ' + p.StateOrProvince : '');
+            var subject  = encodeURIComponent('Property Report Request: ' + fullAddr);
+            var body     = encodeURIComponent('Hi Chip,\n\nI\'d like to request a property report for ' + fullAddr + '.\n\nThank you.');
+
+            document.getElementById('heroAgents').innerHTML =
+                '<div class="off-market-panel">'
+              + '<div class="omp-icon">&#127968;</div>'
+              + '<h3 class="omp-title">This Property Is Not Currently Listed</h3>'
+              + '<p class="omp-message">MLS data is unavailable for this address. For a comprehensive property report — including ownership history, valuation analysis, and neighborhood market data — contact Chip McAllister directly.</p>'
+              + '<a href="mailto:Chip@chipandkim.com?subject=' + subject + '&body=' + body + '" class="omp-cta">Request a Property Report</a>'
+              + '<div class="omp-contacts">'
+              + '<a href="tel:9497359415" class="omp-contact-link">&#128222;&ensp;(949) 735-9415</a>'
+              + '<a href="mailto:Chip@chipandkim.com" class="omp-contact-link">&#9993;&ensp;Chip@chipandkim.com</a>'
+              + '</div>'
+              + '<div class="omp-agent-line">Chip McAllister &middot; Broker Associate &middot; DRE #01971252 &middot; HomeSmart, Evergreen Realty</div>'
+              + '</div>';
+
+            document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        // Restore sections that may have been hidden by a prior off-market render
+        if (priceBlock)  priceBlock.classList.remove('hidden');
+        if (statsBar)    statsBar.classList.remove('hidden');
+
         var price = p.ClosePrice || p.ListPrice;
         document.getElementById('heroPrice').textContent = price ? '$' + num(price) : '—';
         if (price && p.LivingArea) {

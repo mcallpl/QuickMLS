@@ -307,6 +307,69 @@ body {
 /* ── Hero Body ────────────────────────────────────────── */
 .hero-body { padding: 28px; }
 
+/* ── Off-Market Contact Panel ────────────────────────── */
+.off-market-panel {
+    margin: 24px 0 8px;
+    padding: 32px 28px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    text-align: center;
+}
+.off-market-panel .omp-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.7;
+}
+.off-market-panel .omp-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin: 0 0 12px;
+    letter-spacing: 0.2px;
+}
+.off-market-panel .omp-message {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.65;
+    max-width: 480px;
+    margin: 0 auto 24px;
+}
+.off-market-panel .omp-cta {
+    display: inline-block;
+    padding: 13px 32px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: opacity 0.15s;
+    margin-bottom: 20px;
+}
+.off-market-panel .omp-cta:hover { opacity: 0.85; }
+.off-market-panel .omp-contacts {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.off-market-panel .omp-contact-link {
+    font-size: 13px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+.off-market-panel .omp-contact-link:hover { text-decoration: underline; }
+.off-market-panel .omp-agent-line {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
 .hero-address-row {
     display: flex; justify-content: space-between; align-items: flex-start;
     gap: 20px; flex-wrap: wrap;
