@@ -16,7 +16,7 @@ $token = trim($_GET['t'] ?? '');
 if (!$token) { http_response_code(404); echo 'Invalid link.'; exit; }
 
 $db   = getDb();
-$stmt = $db->prepare("SELECT address, hero_listing_key, radius_miles FROM shares WHERE token = ?");
+$stmt = $db->prepare("SELECT address, hero_listing_key, radius_miles, filter_types, filter_subtypes FROM shares WHERE token = ?");
 $stmt->bind_param('s', $token);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -28,6 +28,8 @@ if (!$share) { http_response_code(404); echo 'This link has expired or is invali
 $shareAddress    = $share['address'];
 $heroListingKey  = $share['hero_listing_key'] ?? '';
 $shareRadius     = (float)$share['radius_miles'];
+$shareFilterTypes    = json_decode($share['filter_types'] ?? 'null', true);
+$shareFilterSubTypes = json_decode($share['filter_subtypes'] ?? 'null', true);
 
 // ── Do the search server-side ──
 $searchData = null;
@@ -124,13 +126,15 @@ try {
         usort($comps, fn($a, $b) => ($a['_distance'] ?? 999) <=> ($b['_distance'] ?? 999));
 
         $searchData = [
-            'success'      => true,
-            'geocoded'     => $geo,
-            'subject'      => $subject,
-            'comps'        => $comps,
-            'compCount'    => count($comps),
-            'address'      => $shareAddress,
-            'radius_miles' => $shareRadius,
+            'success'         => true,
+            'geocoded'        => $geo,
+            'subject'         => $subject,
+            'comps'           => $comps,
+            'compCount'       => count($comps),
+            'address'         => $shareAddress,
+            'radius_miles'    => $shareRadius,
+            'filter_types'    => $shareFilterTypes,
+            'filter_subtypes' => $shareFilterSubTypes,
         ];
     }
 } catch (Exception $e) {

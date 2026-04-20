@@ -22,6 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $address        = trim($_POST['address'] ?? '');
 $heroListingKey = trim($_POST['hero_listing_key'] ?? '');
 $radiusMiles    = floatval($_POST['radius_miles'] ?? 0.125);
+$filterTypes    = trim($_POST['filter_types'] ?? '[]');
+$filterSubTypes = trim($_POST['filter_subtypes'] ?? '[]');
+
+// Validate JSON blobs
+if (!is_array(json_decode($filterTypes, true)))    $filterTypes    = '[]';
+if (!is_array(json_decode($filterSubTypes, true))) $filterSubTypes = '[]';
 
 if (!$address) {
     echo json_encode(['success' => false, 'error' => 'Address is required']);
@@ -33,8 +39,8 @@ $token = bin2hex(random_bytes(16));
 
 // Save to database
 $db   = getDb();
-$stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, created_by) VALUES (?, ?, ?, ?, ?)");
-$stmt->bind_param('sssdi', $token, $address, $heroListingKey, $radiusMiles, $_SESSION['user_id']);
+$stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, filter_types, filter_subtypes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+$stmt->bind_param('sssdssi', $token, $address, $heroListingKey, $radiusMiles, $filterTypes, $filterSubTypes, $_SESSION['user_id']);
 $stmt->execute();
 $stmt->close();
 

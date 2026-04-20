@@ -25,7 +25,11 @@
     var carouselIdx = 0;
     var map         = null;
     var markers     = [];
-    var currentRadius = 0.10;  // miles
+    var currentRadius = 0.10;
+    if (!clientMode) {
+        var _sr = parseFloat(sessionStorage.getItem('quickmls_radius') || '');
+        if (_sr >= 0.05 && _sr <= 2.0) currentRadius = _sr;
+    }
     var radiusCircle  = null;   // Leaflet circle layer
     var radiusDebounce = null;  // debounce timer for re-fetch
     var allCompsData  = [];     // unfiltered comps (master list)
@@ -70,6 +74,7 @@
 
         radiusSlider.addEventListener('input', function() {
             currentRadius = parseFloat(this.value);
+            try { sessionStorage.setItem('quickmls_radius', currentRadius); } catch(e) {}
             radiusLabel.textContent = formatRadius(currentRadius);
             updateRadiusDisplay();
             highlightActiveTick(currentRadius);
@@ -223,7 +228,8 @@
             return;
         }
 
-        buildCompFilters();
+        buildCompFilters(data.filter_types !== undefined ? data.filter_types : null,
+                         data.filter_subtypes !== undefined ? data.filter_subtypes : null);
         applyCompFilters();
         renderAll();
     };
@@ -685,6 +691,16 @@
             fd.append('hero_listing_key', heroData ? (heroData.ListingKey || '') : '');
             fd.append('radius_miles', currentRadius);
 
+            // Snapshot the active filter selections so the client sees exactly this view
+            var _ftypes = [], _fsubs = [];
+            var _fc = document.getElementById('compFilters');
+            if (_fc) {
+                _fc.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) { _ftypes.push(cb.value); });
+                _fc.querySelectorAll('input[data-filter-type="subtype"]:checked').forEach(function(cb) { _fsubs.push(cb.value); });
+            }
+            fd.append('filter_types', JSON.stringify(_ftypes));
+            fd.append('filter_subtypes', JSON.stringify(_fsubs));
+
             fetch('api/share.php', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
@@ -733,85 +749,91 @@
     //  COMP TYPE FILTERS (checkboxes)
     // ═══════════════════════════════════════════════════════════
 
-    function buildCompFilters() {
+    // lockedTypes/lockedSubTypes: arrays from a share (client mode); undefined = read from session or hero default
+    function buildCompFilters(lockedTypes, lockedSubTypes) {
         var container = document.getElementById('compFilters');
         if (!container) return;
 
-        // Determine hero's types
-        var heroType    = heroData.PropertyType || '';
+        var heroType    = heroData.PropertyType    || '';
         var heroSubType = heroData.PropertySubType || '';
 
-        // Collect all unique PropertyTypes and SubTypes from comps + hero
-        var allProps = [heroData].concat(allCompsData);
-        var typeSet = {};
-        var subTypeSet = {};
-        allProps.forEach(function(p) {
-            var pt = p.PropertyType || '';
-            var pst = p.PropertySubType || '';
-            if (pt) typeSet[pt] = true;
-            if (pst) subTypeSet[pst] = true;
-        });
+        // Resolve which values to pre-check:
+        // Priority: share-locked (client) → sessionStorage (admin) → hero's type (default)
+        var activeTypes, activeSubs;
+        if (lockedTypes !== undefined && lockedTypes !== null) {
+            activeTypes = lockedTypes;
+            activeSubs  = (lockedSubTypes !== undefined && lockedSubTypes !== null) ? lockedSubTypes : [];
+        } else if (!clientMode) {
+            try {
+                var _st = sessionStorage.getItem('quickmls_filter_types');
+                var _ss = sessionStorage.getItem('quickmls_filter_subtypes');
+                activeTypes = _st ? JSON.parse(_st) : null;
+                activeSubs  = _ss ? JSON.parse(_ss) : null;
+            } catch(e) { activeTypes = null; activeSubs = null; }
+        }
 
-        var types = Object.keys(typeSet).sort();
+        // Collect all unique property types/subtypes from this result set
+        var allProps = [heroData].concat(allCompsData);
+        var typeSet = {}, subTypeSet = {};
+        allProps.forEach(function(p) {
+            if (p.PropertyType)    typeSet[p.PropertyType]       = true;
+            if (p.PropertySubType) subTypeSet[p.PropertySubType] = true;
+        });
+        var types    = Object.keys(typeSet).sort();
         var subTypes = Object.keys(subTypeSet).sort();
 
-        // Build the filter UI
         var html = '<div class="comp-filters-inner">';
         html += '<span class="comp-filters-label">Show:</span>';
 
-        // PropertyType checkboxes (Sale vs Lease)
         types.forEach(function(t) {
-            var checked = (t === heroType) ? ' checked' : '';
-            var label = formatFilterLabel(t);
-            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="type" value="' + escAttr(t) + '"' + checked + '><span>' + esc(label) + '</span></label>';
+            var on = (activeTypes != null) ? (activeTypes.indexOf(t) !== -1) : (t === heroType);
+            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="type" value="' + escAttr(t) + '"' + (on ? ' checked' : '') + '><span>' + esc(formatFilterLabel(t)) + '</span></label>';
         });
 
-        // Separator if both exist
-        if (types.length > 0 && subTypes.length > 0) {
-            html += '<span class="comp-filters-sep">|</span>';
-        }
+        if (types.length > 0 && subTypes.length > 0) html += '<span class="comp-filters-sep">|</span>';
 
-        // PropertySubType checkboxes (SFR, Condo, Townhouse, etc.)
         subTypes.forEach(function(st) {
-            var checked = (st === heroSubType) ? ' checked' : '';
-            var label = formatFilterLabel(st);
-            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="subtype" value="' + escAttr(st) + '"' + checked + '><span>' + esc(label) + '</span></label>';
+            var on = (activeSubs != null) ? (activeSubs.indexOf(st) !== -1) : (st === heroSubType);
+            html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="subtype" value="' + escAttr(st) + '"' + (on ? ' checked' : '') + '><span>' + esc(formatFilterLabel(st)) + '</span></label>';
         });
 
         html += '</div>';
         container.innerHTML = html;
-        container.classList.remove('hidden');
 
-        // Attach change listeners
-        container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
-            cb.addEventListener('change', function() {
-                applyCompFilters();
-                renderAll();
+        if (clientMode) {
+            // Client view: filter UI is hidden — comps are locked to what the agent selected
+        } else {
+            container.classList.remove('hidden');
+            container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    applyCompFilters();
+                    renderAll();
+                });
             });
-        });
+        }
     }
 
     function applyCompFilters() {
         var container = document.getElementById('compFilters');
         if (!container) { compsData = allCompsData.slice(); return; }
 
-        // Get checked types
-        var checkedTypes = [];
-        var checkedSubTypes = [];
-        container.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) {
-            checkedTypes.push(cb.value);
-        });
-        container.querySelectorAll('input[data-filter-type="subtype"]:checked').forEach(function(cb) {
-            checkedSubTypes.push(cb.value);
-        });
+        var checkedTypes = [], checkedSubTypes = [];
+        container.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) { checkedTypes.push(cb.value); });
+        container.querySelectorAll('input[data-filter-type="subtype"]:checked').forEach(function(cb) { checkedSubTypes.push(cb.value); });
 
         compsData = allCompsData.filter(function(c) {
-            var pt = c.PropertyType || '';
-            var pst = c.PropertySubType || '';
-            var typeOk = checkedTypes.length === 0 || checkedTypes.indexOf(pt) !== -1;
-            var subTypeOk = checkedSubTypes.length === 0 || checkedSubTypes.indexOf(pst) !== -1;
+            var typeOk    = checkedTypes.length    === 0 || checkedTypes.indexOf(c.PropertyType    || '') !== -1;
+            var subTypeOk = checkedSubTypes.length === 0 || checkedSubTypes.indexOf(c.PropertySubType || '') !== -1;
             return typeOk && subTypeOk;
         });
+
+        // Persist selections for the next search (admin only)
+        if (!clientMode) {
+            try {
+                sessionStorage.setItem('quickmls_filter_types',    JSON.stringify(checkedTypes));
+                sessionStorage.setItem('quickmls_filter_subtypes', JSON.stringify(checkedSubTypes));
+            } catch(e) {}
+        }
     }
 
     function formatFilterLabel(val) {

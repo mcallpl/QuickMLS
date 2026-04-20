@@ -40,6 +40,8 @@ $db->query("
         address TEXT NOT NULL,
         hero_listing_key VARCHAR(50) DEFAULT NULL,
         radius_miles DECIMAL(6,4) NOT NULL DEFAULT 0.1250,
+        filter_types TEXT DEFAULT NULL,
+        filter_subtypes TEXT DEFAULT NULL,
         created_by INT UNSIGNED,
         client_phone VARCHAR(500),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -47,6 +49,11 @@ $db->query("
     ) ENGINE=InnoDB
 ");
 echo "Table 'shares' ready.\n";
+
+// Migrations for existing installations (safe to re-run)
+$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_types TEXT DEFAULT NULL");
+$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_subtypes TEXT DEFAULT NULL");
+echo "Migrations applied.\n";
 
 // Insert admin user (mcallpl / amazing)
 $hash = password_hash('amazing', PASSWORD_DEFAULT);
