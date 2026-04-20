@@ -127,7 +127,7 @@ try {
 
     // 5. Photos for subject + comps
     $allKeys = [];
-    if ($subject) $allKeys[] = $subject['ListingKey'];
+    if ($subject) $allKeys[] = $subject['ListingKey'] ?? null;
     foreach ($comps as $c) $allKeys[] = $c['ListingKey'];
     $allKeys = array_unique(array_filter($allKeys));
 
