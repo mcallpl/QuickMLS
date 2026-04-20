@@ -136,11 +136,21 @@ try {
         . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
         . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/photo.php?url=';
 
-    // Attach photos to subject (synthetic subjects have no ListingKey — skip)
-    if ($subject && !($subject['_not_in_mls'] ?? false)) {
-        $rawPhotos = $photos[$subject['ListingKey']] ?? [];
-        $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
-        $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
+    // Attach photos to subject
+    if ($subject) {
+        if ($subject['_not_in_mls'] ?? false) {
+            // Use Google Street View as the photo for off-market properties
+            $svUrl = 'https://maps.googleapis.com/maps/api/streetview'
+                . '?size=800x500'
+                . '&location=' . $geo['lat'] . ',' . $geo['lng']
+                . '&fov=90&pitch=10&source=outdoor'
+                . '&key=' . GOOGLE_MAPS_API_KEY;
+            $subject['_photos'] = [$photoBaseUrl . urlencode($svUrl)];
+        } else {
+            $rawPhotos = $photos[$subject['ListingKey']] ?? [];
+            $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
+            $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
+        }
     }
 
     // Attach photos + distance to comps
