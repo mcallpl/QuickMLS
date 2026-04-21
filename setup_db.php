@@ -42,6 +42,11 @@ $db->query("
         radius_miles DECIMAL(6,4) NOT NULL DEFAULT 0.1250,
         filter_types TEXT DEFAULT NULL,
         filter_subtypes TEXT DEFAULT NULL,
+        snapshot_hero MEDIUMTEXT DEFAULT NULL,
+        snapshot_comps MEDIUMTEXT DEFAULT NULL,
+        map_zoom TINYINT UNSIGNED DEFAULT NULL,
+        map_lat DECIMAL(10,7) DEFAULT NULL,
+        map_lng DECIMAL(10,7) DEFAULT NULL,
         created_by INT UNSIGNED,
         client_phone VARCHAR(500),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -55,8 +60,18 @@ echo "Table 'shares' ready.\n";
 $cols = [];
 $r = $db->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shares'");
 while ($row = $r->fetch_row()) $cols[] = $row[0];
-if (!in_array('filter_types',    $cols)) $db->query("ALTER TABLE shares ADD COLUMN filter_types TEXT DEFAULT NULL");
-if (!in_array('filter_subtypes', $cols)) $db->query("ALTER TABLE shares ADD COLUMN filter_subtypes TEXT DEFAULT NULL");
+$migrations = [
+    'filter_types'    => 'TEXT DEFAULT NULL',
+    'filter_subtypes' => 'TEXT DEFAULT NULL',
+    'snapshot_hero'   => 'MEDIUMTEXT DEFAULT NULL',
+    'snapshot_comps'  => 'MEDIUMTEXT DEFAULT NULL',
+    'map_zoom'        => 'TINYINT UNSIGNED DEFAULT NULL',
+    'map_lat'         => 'DECIMAL(10,7) DEFAULT NULL',
+    'map_lng'         => 'DECIMAL(10,7) DEFAULT NULL',
+];
+foreach ($migrations as $col => $def) {
+    if (!in_array($col, $cols)) $db->query("ALTER TABLE shares ADD COLUMN $col $def");
+}
 echo "Migrations applied.\n";
 
 // Insert admin user (mcallpl / amazing)

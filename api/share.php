@@ -24,10 +24,17 @@ $heroListingKey = trim($_POST['hero_listing_key'] ?? '');
 $radiusMiles    = floatval($_POST['radius_miles'] ?? 0.125);
 $filterTypes    = trim($_POST['filter_types'] ?? '[]');
 $filterSubTypes = trim($_POST['filter_subtypes'] ?? '[]');
+$snapshotHero   = trim($_POST['snapshot_hero']  ?? '');
+$snapshotComps  = trim($_POST['snapshot_comps'] ?? '[]');
+$mapZoom        = intval($_POST['map_zoom'] ?? 0) ?: null;
+$mapLat         = ($v = floatval($_POST['map_lat'] ?? 0)) ? $v : null;
+$mapLng         = ($v = floatval($_POST['map_lng'] ?? 0)) ? $v : null;
 
 // Validate JSON blobs
 if (!is_array(json_decode($filterTypes, true)))    $filterTypes    = '[]';
 if (!is_array(json_decode($filterSubTypes, true))) $filterSubTypes = '[]';
+if (!is_array(json_decode($snapshotComps, true)))  $snapshotComps  = '[]';
+if (!json_decode($snapshotHero))                   $snapshotHero   = null;
 
 if (!$address) {
     echo json_encode(['success' => false, 'error' => 'Address is required']);
@@ -40,12 +47,12 @@ $token = bin2hex(random_bytes(16));
 // Save to database
 $db   = getDb();
 
-$stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, filter_types, filter_subtypes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+$stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, filter_types, filter_subtypes, created_by, snapshot_hero, snapshot_comps, map_zoom, map_lat, map_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 if (!$stmt) {
     echo json_encode(['success' => false, 'error' => 'Database error: ' . $db->error]);
     exit;
 }
-$stmt->bind_param('sssdssi', $token, $address, $heroListingKey, $radiusMiles, $filterTypes, $filterSubTypes, $_SESSION['user_id']);
+$stmt->bind_param('sssdssissidd', $token, $address, $heroListingKey, $radiusMiles, $filterTypes, $filterSubTypes, $_SESSION['user_id'], $snapshotHero, $snapshotComps, $mapZoom, $mapLat, $mapLng);
 if (!$stmt->execute()) {
     echo json_encode(['success' => false, 'error' => 'Failed to save share: ' . $stmt->error]);
     exit;

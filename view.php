@@ -16,7 +16,7 @@ $token = trim($_GET['t'] ?? '');
 if (!$token) { http_response_code(404); echo 'Invalid link.'; exit; }
 
 $db   = getDb();
-$stmt = $db->prepare("SELECT address, hero_listing_key, radius_miles, filter_types, filter_subtypes FROM shares WHERE token = ?");
+$stmt = $db->prepare("SELECT address, hero_listing_key, radius_miles, filter_types, filter_subtypes, snapshot_hero, snapshot_comps, map_zoom, map_lat, map_lng FROM shares WHERE token = ?");
 $stmt->bind_param('s', $token);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -25,120 +25,132 @@ $stmt->close();
 
 if (!$share) { http_response_code(404); echo 'This link has expired or is invalid.'; exit; }
 
-$shareAddress    = $share['address'];
-$heroListingKey  = $share['hero_listing_key'] ?? '';
-$shareRadius     = (float)$share['radius_miles'];
-$shareFilterTypes    = json_decode($share['filter_types'] ?? 'null', true);
+$shareAddress        = $share['address'];
+$heroListingKey      = $share['hero_listing_key'] ?? '';
+$shareRadius         = (float)$share['radius_miles'];
+$shareFilterTypes    = json_decode($share['filter_types']    ?? 'null', true);
 $shareFilterSubTypes = json_decode($share['filter_subtypes'] ?? 'null', true);
 
-// ── Do the search server-side ──
+// ── Use snapshot if available (exact replica of what agent saw) ──
 $searchData = null;
-try {
-    // Reuse the same search logic from api/search.php
-    $selectFields = implode(',', [
-        'ListingKey','ListingId','StandardStatus',
-        'ListPrice','OriginalListPrice','ClosePrice','CloseDate',
-        'StreetNumber','StreetName','StreetSuffix','StreetDirPrefix','StreetDirSuffix',
-        'UnitNumber','City','StateOrProvince','PostalCode','CountyOrParish',
-        'Latitude','Longitude',
-        'BedroomsTotal','BathroomsTotalInteger','BathroomsFull','BathroomsHalf',
-        'LivingArea','LotSizeAcres','LotSizeSquareFeet','YearBuilt','GarageSpaces',
-        'StoriesTotal','Flooring','Heating','Cooling','Roof','PoolPrivateYN',
-        'PropertyType','PropertySubType',
-        'PublicRemarks','SyndicationRemarks',
-        'Appliances','InteriorFeatures','ExteriorFeatures',
-        'ParkingFeatures','LaundryFeatures','FireplaceFeatures',
-        'WaterSource','Sewer','Electric',
-        'FoundationDetails','ArchitecturalStyle','BuildingAreaTotal',
-        'CommonWalls','ConstructionMaterials','DirectionFaces',
-        'PatioAndPorchFeatures','SecurityFeatures','View',
-        'WindowFeatures','Fencing',
-        'AssociationFee','AssociationFeeFrequency',
-        'DaysOnMarket','CumulativeDaysOnMarket','ModificationTimestamp','ListingContractDate',
-        'TaxAnnualAmount','TaxAssessedValue',
-    ]);
+if (!empty($share['snapshot_hero'])) {
+    $snapshotHero  = json_decode($share['snapshot_hero'], true);
+    $snapshotComps = json_decode($share['snapshot_comps'] ?? '[]', true) ?: [];
+    $mapLat = $share['map_lat'] ? (float)$share['map_lat'] : (float)($snapshotHero['Latitude'] ?? 0);
+    $mapLng = $share['map_lng'] ? (float)$share['map_lng'] : (float)($snapshotHero['Longitude'] ?? 0);
+    $searchData = [
+        'success'         => true,
+        'geocoded'        => ['lat' => $mapLat, 'lng' => $mapLng],
+        'subject'         => $snapshotHero,
+        'comps'           => $snapshotComps,
+        'compCount'       => count($snapshotComps),
+        'address'         => $shareAddress,
+        'radius_miles'    => $shareRadius,
+        'filter_types'    => $shareFilterTypes,
+        'filter_subtypes' => $shareFilterSubTypes,
+        'map_zoom'        => $share['map_zoom'] ? (int)$share['map_zoom'] : null,
+    ];
+} else {
+    // ── Legacy fallback: re-query MLS (for old shares without snapshots) ──
+    try {
+        $selectFields = implode(',', [
+            'ListingKey','ListingId','StandardStatus',
+            'ListPrice','OriginalListPrice','ClosePrice','CloseDate',
+            'StreetNumber','StreetName','StreetSuffix','StreetDirPrefix','StreetDirSuffix',
+            'UnitNumber','City','StateOrProvince','PostalCode','CountyOrParish',
+            'Latitude','Longitude',
+            'BedroomsTotal','BathroomsTotalInteger','BathroomsFull','BathroomsHalf',
+            'LivingArea','LotSizeAcres','LotSizeSquareFeet','YearBuilt','GarageSpaces',
+            'StoriesTotal','Flooring','Heating','Cooling','Roof','PoolPrivateYN',
+            'PropertyType','PropertySubType',
+            'PublicRemarks','SyndicationRemarks',
+            'Appliances','InteriorFeatures','ExteriorFeatures',
+            'ParkingFeatures','LaundryFeatures','FireplaceFeatures',
+            'WaterSource','Sewer','Electric',
+            'FoundationDetails','ArchitecturalStyle','BuildingAreaTotal',
+            'CommonWalls','ConstructionMaterials','DirectionFaces',
+            'PatioAndPorchFeatures','SecurityFeatures','View',
+            'WindowFeatures','Fencing',
+            'AssociationFee','AssociationFeeFrequency',
+            'DaysOnMarket','CumulativeDaysOnMarket','ModificationTimestamp','ListingContractDate',
+            'TaxAnnualAmount','TaxAssessedValue',
+        ]);
 
-    require_once __DIR__ . '/api/search_helpers.php';
+        require_once __DIR__ . '/api/search_helpers.php';
 
-    $addrParts = parseAddressString($shareAddress);
-    $geo = geocodeAddress($shareAddress);
+        $addrParts = parseAddressString($shareAddress);
+        $geo = geocodeAddress($shareAddress);
 
-    if ($geo) {
-        $subject = findSubjectProperty($addrParts, $geo, $selectFields);
+        if ($geo) {
+            $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
-        // If we have a specific hero ListingKey, make sure we use it
-        if ($heroListingKey) {
-            // Try to find the hero by ListingKey in subject or via direct lookup
-            if (!$subject || ($subject['ListingKey'] ?? '') !== $heroListingKey) {
-                // Direct lookup by ListingKey
-                try {
-                    $heroResult = trestleGet('Property', [
-                        '$filter'  => "ListingKey eq '" . addslashes($heroListingKey) . "'",
-                        '$select'  => $selectFields,
-                        '$top'     => 1,
-                    ]);
-                    $heroProps = $heroResult['value'] ?? [];
-                    if (!empty($heroProps)) {
-                        $subject = $heroProps[0];
-                        // Use hero's coordinates for geocoding if available
-                        if ($subject['Latitude'] && $subject['Longitude']) {
-                            $geo['lat'] = (float)$subject['Latitude'];
-                            $geo['lng'] = (float)$subject['Longitude'];
+            if ($heroListingKey) {
+                if (!$subject || ($subject['ListingKey'] ?? '') !== $heroListingKey) {
+                    try {
+                        $heroResult = trestleGet('Property', [
+                            '$filter'  => "ListingKey eq '" . addslashes($heroListingKey) . "'",
+                            '$select'  => $selectFields,
+                            '$top'     => 1,
+                        ]);
+                        $heroProps = $heroResult['value'] ?? [];
+                        if (!empty($heroProps)) {
+                            $subject = $heroProps[0];
+                            if ($subject['Latitude'] && $subject['Longitude']) {
+                                $geo['lat'] = (float)$subject['Latitude'];
+                                $geo['lng'] = (float)$subject['Longitude'];
+                            }
                         }
-                    }
-                } catch (Exception $e) {
-                    // Fall back to address-based subject
+                    } catch (Exception $e) {}
                 }
             }
-        }
 
-        // Get ALL comps — frontend handles type filtering via checkboxes
-        $comps = getComps($geo, $shareRadius, $selectFields);
+            $comps = getComps($geo, $shareRadius, $selectFields);
 
-        // Photos
-        $allKeys = [];
-        if ($subject) $allKeys[] = $subject['ListingKey'];
-        foreach ($comps as $c) $allKeys[] = $c['ListingKey'];
-        $allKeys = array_unique(array_filter($allKeys));
-        $photos = batchGetAllPhotos($allKeys);
+            $allKeys = [];
+            if ($subject) $allKeys[] = $subject['ListingKey'];
+            foreach ($comps as $c) $allKeys[] = $c['ListingKey'];
+            $allKeys = array_unique(array_filter($allKeys));
+            $photos  = batchGetAllPhotos($allKeys);
 
-        $photoBaseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-            . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
-            . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/api/photo.php?url=';
+            $photoBaseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+                . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/api/photo.php?url=';
 
-        if ($subject) {
-            $rawPhotos = $photos[$subject['ListingKey']] ?? [];
-            $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
-            $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
-        }
-        foreach ($comps as &$comp) {
-            $rawPhotos = $photos[$comp['ListingKey'] ?? ''] ?? [];
-            $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
-            $comp['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
-            $cLat = (float)($comp['Latitude'] ?? 0);
-            $cLng = (float)($comp['Longitude'] ?? 0);
-            if ($cLat && $cLng) {
-                $comp['_distance'] = haversineDistance($geo['lat'], $geo['lng'], $cLat, $cLng);
-                $comp['_distanceFt'] = round($comp['_distance'] * 5280);
+            if ($subject) {
+                $rawPhotos = $photos[$subject['ListingKey']] ?? [];
+                $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
+                $subject['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
             }
-        }
-        unset($comp);
-        usort($comps, fn($a, $b) => ($a['_distance'] ?? 999) <=> ($b['_distance'] ?? 999));
+            foreach ($comps as &$comp) {
+                $rawPhotos = $photos[$comp['ListingKey'] ?? ''] ?? [];
+                $rawPhotos = array_values(array_filter($rawPhotos, fn($u) => $u && strlen($u) > 5));
+                $comp['_photos'] = array_map(fn($u) => $photoBaseUrl . urlencode($u), $rawPhotos);
+                $cLat = (float)($comp['Latitude'] ?? 0);
+                $cLng = (float)($comp['Longitude'] ?? 0);
+                if ($cLat && $cLng) {
+                    $comp['_distance']   = haversineDistance($geo['lat'], $geo['lng'], $cLat, $cLng);
+                    $comp['_distanceFt'] = round($comp['_distance'] * 5280);
+                }
+            }
+            unset($comp);
+            usort($comps, fn($a, $b) => ($a['_distance'] ?? 999) <=> ($b['_distance'] ?? 999));
 
-        $searchData = [
-            'success'         => true,
-            'geocoded'        => $geo,
-            'subject'         => $subject,
-            'comps'           => $comps,
-            'compCount'       => count($comps),
-            'address'         => $shareAddress,
-            'radius_miles'    => $shareRadius,
-            'filter_types'    => $shareFilterTypes,
-            'filter_subtypes' => $shareFilterSubTypes,
-        ];
+            $searchData = [
+                'success'         => true,
+                'geocoded'        => $geo,
+                'subject'         => $subject,
+                'comps'           => $comps,
+                'compCount'       => count($comps),
+                'address'         => $shareAddress,
+                'radius_miles'    => $shareRadius,
+                'filter_types'    => $shareFilterTypes,
+                'filter_subtypes' => $shareFilterSubTypes,
+                'map_zoom'        => null,
+            ];
+        }
+    } catch (Exception $e) {
+        // Search failed — page will show error
     }
-} catch (Exception $e) {
-    // Search failed — page will show error
 }
 
 $v = time();

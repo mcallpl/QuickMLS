@@ -33,6 +33,7 @@
     var radiusCircle  = null;   // Leaflet circle layer
     var radiusDebounce = null;  // debounce timer for re-fetch
     var allCompsData  = [];     // unfiltered comps (master list)
+    var mapZoomOverride = null; // snapshot zoom for client view
 
     // ═══════════════════════════════════════════════════════════
     //  THEME TOGGLE
@@ -216,6 +217,7 @@
         hideLoader();
         appData = data;
         currentRadius = data.radius_miles || currentRadius;
+        if (data.map_zoom) mapZoomOverride = data.map_zoom;
 
         if (data.subject) {
             heroData = data.subject;
@@ -586,7 +588,8 @@
         if (map) { map.remove(); map = null; }
         markers = [];
 
-        map = L.map(mapEl).setView([geo.lat, geo.lng], getZoomForRadius(currentRadius));
+        var zoom = (mapZoomOverride !== null) ? mapZoomOverride : getZoomForRadius(currentRadius);
+        map = L.map(mapEl).setView([geo.lat, geo.lng], zoom);
 
         var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
         var tileUrl = isDark
@@ -699,6 +702,11 @@
             }
             fd.append('filter_types', JSON.stringify(_ftypes));
             fd.append('filter_subtypes', JSON.stringify(_fsubs));
+            fd.append('snapshot_hero',  JSON.stringify(heroData));
+            fd.append('snapshot_comps', JSON.stringify(compsData));
+            fd.append('map_zoom', map ? map.getZoom() : getZoomForRadius(currentRadius));
+            fd.append('map_lat',  appData && appData.geocoded ? appData.geocoded.lat : '');
+            fd.append('map_lng',  appData && appData.geocoded ? appData.geocoded.lng : '');
 
             fetch('api/share.php', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
