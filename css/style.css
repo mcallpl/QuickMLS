@@ -699,6 +699,15 @@ body {
     outline: none;
 }
 .send-form input:focus { border-color: var(--accent); }
+.send-name-input {
+    width: 100%; box-sizing: border-box;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    font-size: 15px; color: var(--text); font-family: var(--font);
+    outline: none; margin-bottom: 4px;
+}
+.send-name-input:focus { border-color: var(--accent); }
+.send-name-input::placeholder { color: var(--text-dim); }
 .send-submit-btn {
     background: var(--green); color: #fff; border: none;
     font-weight: 700; font-size: 14px; padding: 12px;
@@ -706,6 +715,15 @@ body {
     margin-top: 4px;
 }
 .send-submit-btn:hover { opacity: 0.85; }
+.send-message-textarea {
+    width: 100%; box-sizing: border-box;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    font-size: 13px; color: var(--text); font-family: var(--font);
+    line-height: 1.6; outline: none; resize: vertical;
+    margin-top: 10px;
+}
+.send-message-textarea:focus { border-color: var(--accent); }
 
 /* ── Contact Search Autocomplete ──────────────────────── */
 .contact-search-wrap {

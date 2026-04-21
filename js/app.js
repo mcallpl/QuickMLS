@@ -658,6 +658,7 @@
     var sendClose = document.getElementById('sendModalClose');
     var sendForm  = document.getElementById('sendForm');
     var generatedShareUrl = '';
+    var generatedMessage  = '';
 
     if (sendBtn && sendModal) {
         sendBtn.addEventListener('click', function() {
@@ -713,10 +714,15 @@
                 .then(function(d) {
                     if (d.success) {
                         generatedShareUrl = d.share_url;
+                        var firstName = (document.getElementById('clientFirstName').value || '').trim();
+                        var greeting  = firstName ? firstName : 'there';
+                        generatedMessage =
+                            'Hi ' + greeting + ', I just sent you a quick snapshot of the property with a few nearby comps—just a simple way to keep you updated on what’s happening in your area.\n\n'
+                            + d.share_url + '\n\n'
+                            + 'If you’d like, I can also put together a full CMA and detailed property profile. Just let me know.';
+                        document.getElementById('sendMessageText').value = generatedMessage;
                         sendForm.classList.add('hidden');
-                        document.getElementById('sendResultUrl').textContent = d.share_url;
                         document.getElementById('sendResult').classList.remove('hidden');
-                        // Hide share button if Web Share API not supported
                         var shareBtn = document.getElementById('shareLinkBtn');
                         if (shareBtn && !navigator.share) shareBtn.classList.add('hidden');
                     } else {
@@ -730,23 +736,22 @@
                 });
         });
 
-        // Copy link
+        // Copy message
         document.getElementById('copyLinkBtn').addEventListener('click', function() {
-            navigator.clipboard.writeText(generatedShareUrl).then(function() {
+            var text = document.getElementById('sendMessageText').value || generatedMessage;
+            navigator.clipboard.writeText(text).then(function() {
                 var btn = document.getElementById('copyLinkBtn');
                 btn.textContent = 'Copied!';
-                setTimeout(function() { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+                setTimeout(function() { btn.innerHTML = '&#128203; Copy Message'; }, 2000);
             });
         });
 
-        // Native share (mobile)
+        // Native share (mobile) — shares full message
         document.getElementById('shareLinkBtn').addEventListener('click', function() {
             if (navigator.share) {
-                var heroAddr = heroData ? [heroData.StreetNumber, heroData.StreetName].filter(Boolean).join(' ') : 'Property';
+                var text = document.getElementById('sendMessageText').value || generatedMessage;
                 navigator.share({
-                    title: heroAddr + ' — Property Details',
-                    text: 'Check out this property:',
-                    url: generatedShareUrl,
+                    text: text,
                 });
             }
         });
