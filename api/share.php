@@ -39,9 +39,21 @@ $token = bin2hex(random_bytes(16));
 
 // Save to database
 $db   = getDb();
+
+// Auto-apply migrations for columns added after initial deploy
+$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_types TEXT DEFAULT NULL");
+$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_subtypes TEXT DEFAULT NULL");
+
 $stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, filter_types, filter_subtypes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+if (!$stmt) {
+    echo json_encode(['success' => false, 'error' => 'Database error: ' . $db->error]);
+    exit;
+}
 $stmt->bind_param('sssdssi', $token, $address, $heroListingKey, $radiusMiles, $filterTypes, $filterSubTypes, $_SESSION['user_id']);
-$stmt->execute();
+if (!$stmt->execute()) {
+    echo json_encode(['success' => false, 'error' => 'Failed to save share: ' . $stmt->error]);
+    exit;
+}
 $stmt->close();
 
 // Build the share URL
