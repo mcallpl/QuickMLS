@@ -51,8 +51,12 @@ $db->query("
 echo "Table 'shares' ready.\n";
 
 // Migrations for existing installations (safe to re-run)
-$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_types TEXT DEFAULT NULL");
-$db->query("ALTER TABLE shares ADD COLUMN IF NOT EXISTS filter_subtypes TEXT DEFAULT NULL");
+// MySQL 8.0 doesn't support ALTER TABLE ... ADD COLUMN IF NOT EXISTS; check information_schema instead
+$cols = [];
+$r = $db->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='shares'");
+while ($row = $r->fetch_row()) $cols[] = $row[0];
+if (!in_array('filter_types',    $cols)) $db->query("ALTER TABLE shares ADD COLUMN filter_types TEXT DEFAULT NULL");
+if (!in_array('filter_subtypes', $cols)) $db->query("ALTER TABLE shares ADD COLUMN filter_subtypes TEXT DEFAULT NULL");
 echo "Migrations applied.\n";
 
 // Insert admin user (mcallpl / amazing)
