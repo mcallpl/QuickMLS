@@ -36,6 +36,32 @@ if (!is_array(json_decode($filterSubTypes, true))) $filterSubTypes = '[]';
 if (!is_array(json_decode($snapshotComps, true)))  $snapshotComps  = '[]';
 if (!json_decode($snapshotHero))                   $snapshotHero   = null;
 
+// Strip MLS agent/contact fields — clients must never see other agents' info
+$_agentFields = [
+    'ListAgentFullName','ListAgentDirectPhone','ListAgentEmail','ListAgentKey',
+    'ListOfficeName','ListOfficePhone','ListOfficeKey',
+    'BuyerAgentFullName','BuyerAgentDirectPhone','BuyerAgentEmail','BuyerAgentKey',
+    'BuyerOfficeName','BuyerOfficePhone','BuyerOfficeKey',
+    'CoListAgentFullName','CoListAgentDirectPhone','CoListAgentEmail','CoListAgentKey',
+    'ShowingContactName','ShowingContactPhone','ShowingContactType',
+    'PrivateRemarks','ShowingInstructions',
+];
+function _stripAgentData(array $prop, array $fields): array {
+    foreach ($fields as $f) unset($prop[$f]);
+    return $prop;
+}
+if ($snapshotHero) {
+    $h = json_decode($snapshotHero, true);
+    if (is_array($h)) {
+        $snapshotHero = json_encode(_stripAgentData($h, $_agentFields), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+$_compsArr = json_decode($snapshotComps, true) ?: [];
+$snapshotComps = json_encode(
+    array_map(fn($c) => is_array($c) ? _stripAgentData($c, $_agentFields) : $c, $_compsArr),
+    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+);
+
 if (!$address) {
     echo json_encode(['success' => false, 'error' => 'Address is required']);
     exit;

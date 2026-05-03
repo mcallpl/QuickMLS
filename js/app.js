@@ -571,7 +571,12 @@
 
                 // Swap hero into master list, remove clicked from master
                 allCompsData = allCompsData.filter(function(c) { return c.ListingKey !== clickedComp.ListingKey; });
-                allCompsData.push(oldHero);
+                // Off-market subject always pins to front of comps
+                if (oldHero._not_in_mls) {
+                    allCompsData.unshift(oldHero);
+                } else {
+                    allCompsData.push(oldHero);
+                }
                 heroData = clickedComp;
 
                 applyCompFilters();
@@ -833,11 +838,15 @@
         container.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) { checkedTypes.push(cb.value); });
         container.querySelectorAll('input[data-filter-type="subtype"]:checked').forEach(function(cb) { checkedSubTypes.push(cb.value); });
 
-        compsData = allCompsData.filter(function(c) {
+        // Off-market subjects always appear first, regardless of type filters
+        var offMarket = allCompsData.filter(function(c) { return c._not_in_mls; });
+        var regular   = allCompsData.filter(function(c) {
+            if (c._not_in_mls) return false;
             var typeOk    = checkedTypes.length    === 0 || checkedTypes.indexOf(c.PropertyType    || '') !== -1;
             var subTypeOk = checkedSubTypes.length === 0 || checkedSubTypes.indexOf(c.PropertySubType || '') !== -1;
             return typeOk && subTypeOk;
         });
+        compsData = offMarket.concat(regular);
 
         // Persist selections for the next search (admin only)
         if (!clientMode) {
