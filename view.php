@@ -240,7 +240,6 @@ $v = time();
                 <span id="compCount" class="comp-count"></span>
             </h3>
             <div id="map" class="map-container"></div>
-            <div id="compFilters" class="comp-filters hidden"></div>
             <div id="compsList" class="comps-list"></div>
         </div>
     </div>

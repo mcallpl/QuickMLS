@@ -770,6 +770,7 @@
     function buildCompFilters(lockedTypes, lockedSubTypes) {
         var container = document.getElementById('compFilters');
         if (!container) return;
+        if (clientMode) return; // snapshot is pre-filtered; no filter UI for clients
 
         var heroType    = heroData.PropertyType    || '';
         var heroSubType = heroData.PropertySubType || '';
@@ -832,7 +833,11 @@
 
     function applyCompFilters() {
         var container = document.getElementById('compFilters');
-        if (!container) { compsData = allCompsData.slice(); return; }
+        if (!container) {
+            var _om = allCompsData.filter(function(c) { return c._not_in_mls; });
+            compsData = _om.concat(allCompsData.filter(function(c) { return !c._not_in_mls; }));
+            return;
+        }
 
         var checkedTypes = [], checkedSubTypes = [];
         container.querySelectorAll('input[data-filter-type="type"]:checked').forEach(function(cb) { checkedTypes.push(cb.value); });
