@@ -143,9 +143,10 @@ try {
     if ($subject) {
         if ($subject['_not_in_mls'] ?? false) {
             // Use Google Street View as the photo for off-market properties
+            // Use full address string instead of coordinates for better accuracy
             $svUrl = 'https://maps.googleapis.com/maps/api/streetview'
                 . '?size=800x500'
-                . '&location=' . $geo['lat'] . ',' . $geo['lng']
+                . '&location=' . urlencode($fullAddress)
                 . '&fov=90&pitch=10&source=outdoor'
                 . '&key=' . GOOGLE_MAPS_API_KEY;
             $subject['_photos'] = [$photoBaseUrl . urlencode($svUrl)];
