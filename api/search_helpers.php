@@ -45,6 +45,11 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
         $geolng = (float)($geo['lng'] ?? 0);
         $maxDistance = 0.009;
 
+        error_log("DEBUG: Found " . count($props) . " properties from MLS query");
+        foreach ($props as $i => $p) {
+            error_log("DEBUG: Property $i: " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . " at " . ($p['Latitude'] ?? 'no-lat') . ", " . ($p['Longitude'] ?? 'no-lng'));
+        }
+
         // Try to find exact street number match first
         if ($addrParts['number']) {
             foreach ($props as $p) {
@@ -63,7 +68,9 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
                         $pLng = (float)($p['Longitude'] ?? 0);
                         if ($pLat && $pLng && $geolat && $geolng) {
                             $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
+                            error_log("DEBUG: Distance to " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . ": " . number_format($dist, 6) . " miles (max: " . $maxDistance . ")");
                             if ($dist <= $maxDistance) {
+                                error_log("DEBUG: MATCH FOUND: " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? ''));
                                 return $p;
                             }
                         }
@@ -75,16 +82,24 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
         // Fallback: find closest property within max distance
         $closest = null;
         $closestDist = $maxDistance;
+        error_log("DEBUG: Fallback to closest property within " . $maxDistance . " miles");
         foreach ($props as $p) {
             $pLat = (float)($p['Latitude'] ?? 0);
             $pLng = (float)($p['Longitude'] ?? 0);
             if ($pLat && $pLng && $geolat && $geolng) {
                 $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
+                error_log("DEBUG: Closest check - " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . ": " . number_format($dist, 6) . " miles");
                 if ($dist <= $closestDist) {
                     $closest = $p;
                     $closestDist = $dist;
                 }
             }
+        }
+
+        if ($closest) {
+            error_log("DEBUG: Returning closest property: " . ($closest['StreetNumber'] ?? '') . " " . ($closest['StreetName'] ?? '') . " at " . number_format($closestDist, 6) . " miles");
+        } else {
+            error_log("DEBUG: No property found within max distance");
         }
 
         return $closest;

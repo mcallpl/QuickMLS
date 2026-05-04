@@ -101,6 +101,9 @@ try {
     // 3. Find the subject property — exact address match in MLS
     $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
+    // Debug: log what was found
+    error_log("DEBUG: findSubjectProperty returned: " . ($subject ? "Property #" . ($subject['ListingKey'] ?? 'no-key') . " at " . ($subject['StreetNumber'] ?? '') . " " . ($subject['StreetName'] ?? '') : "null"));
+
     // 3b. Not in MLS — build a synthetic subject from the geocoded address
     //     so the searched property is always the hero, not a nearby active listing.
     if (!$subject) {
