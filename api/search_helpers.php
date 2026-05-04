@@ -41,11 +41,15 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
         $props = $result['value'] ?? [];
         if (empty($props)) return null;
 
-        // Only return a match if we have an exact street number match
+        $geolat = (float)($geo['lat'] ?? 0);
+        $geolng = (float)($geo['lng'] ?? 0);
+        $maxDistance = 0.009;
+
+        // Try to find exact street number match first
         if ($addrParts['number']) {
             foreach ($props as $p) {
-                if (($p['StreetNumber'] ?? '') === $addrParts['number']) {
-                    // Also verify street name contains all words
+                if (($p['StreetNumber'] ?? '') == $addrParts['number']) {
+                    // Verify street name contains all significant words
                     $sn = strtolower($p['StreetName'] ?? '');
                     $streetWords = preg_split('/\s+/', strtolower($addrParts['street']));
                     $match = true;
@@ -53,15 +57,37 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
                         if (in_array($w, ['st','ave','blvd','dr','rd','ln','ct','cir','pl','way','pkwy','ter','trl'])) continue;
                         if (strlen($w) >= 2 && strpos($sn, $w) === false) { $match = false; break; }
                     }
-                    if ($match) return $p;
+                    if ($match) {
+                        // Verify coordinates are close to geocoded address (within ~50 feet)
+                        $pLat = (float)($p['Latitude'] ?? 0);
+                        $pLng = (float)($p['Longitude'] ?? 0);
+                        if ($pLat && $pLng && $geolat && $geolng) {
+                            $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
+                            if ($dist <= $maxDistance) {
+                                return $p;
+                            }
+                        }
+                    }
                 }
             }
-            // Street number specified but no exact match found — don't return neighboring property
-            return null;
         }
 
-        // No street number provided — can't safely match, return null
-        return null;
+        // Fallback: find closest property within max distance
+        $closest = null;
+        $closestDist = $maxDistance;
+        foreach ($props as $p) {
+            $pLat = (float)($p['Latitude'] ?? 0);
+            $pLng = (float)($p['Longitude'] ?? 0);
+            if ($pLat && $pLng && $geolat && $geolng) {
+                $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
+                if ($dist <= $closestDist) {
+                    $closest = $p;
+                    $closestDist = $dist;
+                }
+            }
+        }
+
+        return $closest;
     } catch (Exception $e) {
         return null;
     }
