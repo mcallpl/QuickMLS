@@ -41,7 +41,7 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
         $props = $result['value'] ?? [];
         if (empty($props)) return null;
 
-        // Prefer exact street number + street name match
+        // Only return a match if we have an exact street number match
         if ($addrParts['number']) {
             foreach ($props as $p) {
                 if (($p['StreetNumber'] ?? '') === $addrParts['number']) {
@@ -56,9 +56,12 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
                     if ($match) return $p;
                 }
             }
+            // Street number specified but no exact match found — don't return neighboring property
+            return null;
         }
 
-        return $props[0];
+        // No street number provided — can't safely match, return null
+        return null;
     } catch (Exception $e) {
         return null;
     }
