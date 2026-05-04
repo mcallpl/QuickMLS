@@ -137,12 +137,21 @@ function getComps(array $geo, float $radiusMiles, string $selectFields, ?string 
 
 function parseAddressString(string $addr): array {
     $parts = ['number'=>'','street'=>'','city'=>'','state'=>'','zip'=>''];
+
+    // Try full address format: 123 Street Name, City, State ZIP
     if (preg_match('/^(\d+)\s+(.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?/i', $addr, $m)) {
         $parts['number'] = $m[1];
         $parts['street'] = trim($m[2]);
         $parts['city']   = trim($m[3]);
         $parts['state']  = strtoupper($m[4]);
         $parts['zip']    = $m[5] ?? '';
+    } else {
+        // Fallback: try just street address without city/state: 123 Street Name
+        if (preg_match('/^(\d+)\s+(.+)$/', $addr, $m)) {
+            $parts['number'] = $m[1];
+            $parts['street'] = trim($m[2]);
+        }
     }
+
     return $parts;
 }
