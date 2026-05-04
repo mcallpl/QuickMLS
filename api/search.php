@@ -183,6 +183,11 @@ try {
         'compCount'    => count($comps),
         'address'      => $fullAddress,
         'radius_miles' => $radiusMiles,
+        '_debug'       => [
+            'subject_found' => $subject ? true : false,
+            'subject_street' => $subject ? ($subject['StreetNumber'] . ' ' . $subject['StreetName']) : null,
+            'subject_in_mls' => $subject ? !($subject['_not_in_mls'] ?? false) : false,
+        ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Exception $e) {
