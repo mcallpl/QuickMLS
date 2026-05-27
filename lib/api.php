@@ -1,6 +1,13 @@
 <?php
+require_once __DIR__ . '/cache.php';
 
 function trestleGet(string $endpoint, array $params = []): array {
+    // Check cache first
+    $cached = PropertyDataCache::get('trestle', ['endpoint' => $endpoint, 'params' => $params]);
+    if ($cached !== null) {
+        return $cached;
+    }
+
     $token = getAccessToken();
     $url   = TRESTLE_BASE_URL . '/trestle/odata/' . $endpoint;
     if (!empty($params)) {
@@ -32,5 +39,10 @@ function trestleGet(string $endpoint, array $params = []): array {
     }
     if ($httpCode !== 200) throw new Exception("MLS API error (HTTP $httpCode): $response");
 
-    return json_decode($response, true) ?: [];
+    $result = json_decode($response, true) ?: [];
+
+    // Cache the result
+    PropertyDataCache::set('trestle', ['endpoint' => $endpoint, 'params' => $params], $result);
+
+    return $result;
 }
