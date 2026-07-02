@@ -27,6 +27,22 @@ if (!defined('DB_NAME')) define('DB_NAME', 'quickmls');
 if (!defined('REBRANDLY_API_KEY')) define('REBRANDLY_API_KEY', '');
 if (!defined('REBRANDLY_DOMAIN'))  define('REBRANDLY_DOMAIN',  'rebrand.ly');
 
+// Canonical public base URL (e.g. 'https://quickmls.example.com'). When set,
+// share links and the photo-proxy URL are built from THIS instead of the
+// request's Host header, preventing Host-header poisoning of generated links.
+// Leave empty to derive from the request (fine for local/dev).
+if (!defined('APP_BASE_URL')) define('APP_BASE_URL', '');
+
+/** Return the canonical scheme://host for building outbound links. */
+function appBaseUrl(): string {
+    if (defined('APP_BASE_URL') && APP_BASE_URL !== '') {
+        return rtrim(APP_BASE_URL, '/');
+    }
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $scheme . '://' . $host;
+}
+
 // ── Agent Profile (Chip) ──────────────────────────────────
 define('AGENT_NAME',        'Chip McAllister');
 define('AGENT_TITLE',       'Broker Associate');

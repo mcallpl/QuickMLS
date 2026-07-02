@@ -112,8 +112,7 @@ if (!empty($share['snapshot_hero'])) {
             $allKeys = array_unique(array_filter($allKeys));
             $photos  = batchGetAllPhotos($allKeys);
 
-            $photoBaseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-                . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+            $photoBaseUrl = appBaseUrl()
                 . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/api/photo.php?url=';
 
             if ($subject) {

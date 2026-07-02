@@ -749,6 +749,7 @@
             }
 
             var fd = new FormData();
+            fd.append('csrf_token', (typeof CSRF_TOKEN !== 'undefined') ? CSRF_TOKEN : '');
             fd.append('address', heroAddr || (appData && appData.address) || '');
             fd.append('hero_listing_key', heroData ? (heroData.ListingKey || '') : '');
             fd.append('radius_miles', currentRadius);

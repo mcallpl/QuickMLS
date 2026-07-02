@@ -1,6 +1,14 @@
 <?php
 
 function geocodeAddress(string $fullAddress): ?array {
+    // Cache successful geocodes — Nominatim asks for <=1 req/sec, and repeat
+    // searches of the same address would otherwise re-hit it and risk throttling.
+    $cacheKey = ['q' => strtolower(trim($fullAddress))];
+    if (class_exists('PropertyDataCache')) {
+        $cached = PropertyDataCache::get('geocode', $cacheKey);
+        if ($cached !== null && isset($cached['result'])) return $cached['result'];
+    }
+
     $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
         'q'              => $fullAddress,
         'format'         => 'json',
@@ -25,7 +33,7 @@ function geocodeAddress(string $fullAddress): ?array {
     $state = stateNameToAbbr($addr['state'] ?? '') ?: ($addr['state'] ?? '');
     $city  = $addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['county'] ?? '';
 
-    return [
+    $result = [
         'lat'          => (float)$data[0]['lat'],
         'lng'          => (float)$data[0]['lon'],
         'display_name' => $data[0]['display_name'] ?? $fullAddress,
@@ -34,6 +42,11 @@ function geocodeAddress(string $fullAddress): ?array {
         'state'        => $state,
         'county'       => $addr['county']           ?? '',
     ];
+
+    if (class_exists('PropertyDataCache')) {
+        PropertyDataCache::set('geocode', $cacheKey, ['result' => $result]);
+    }
+    return $result;
 }
 
 function haversineDistance(float $lat1, float $lng1, float $lat2, float $lng2): float {

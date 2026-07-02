@@ -268,6 +268,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
 <script>
 var APP_USER = <?= json_encode($user) ?>;
 var IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
+var CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 var CLIENT_MODE = false;
 var GOOGLE_MAPS_KEY = <?= json_encode(GOOGLE_MAPS_API_KEY) ?>;
 </script>

@@ -19,6 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// CSRF: the share is created for the logged-in agent; require the session token.
+if (!verifyCsrf($_POST['csrf_token'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Invalid session token. Please refresh the page and try again.']);
+    exit;
+}
+
 $address        = trim($_POST['address'] ?? '');
 $heroListingKey = trim($_POST['hero_listing_key'] ?? '');
 $radiusMiles    = floatval($_POST['radius_miles'] ?? 0.125);
@@ -87,11 +94,9 @@ if (!$stmt->execute()) {
 }
 $stmt->close();
 
-// Build the share URL
-$scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
+// Build the share URL from the canonical base (not the raw Host header).
 $baseDir = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/\\');
-$longUrl = "$scheme://$host$baseDir/view.php?t=$token";
+$longUrl = appBaseUrl() . "$baseDir/view.php?t=$token";
 
 // Try Rebrandly shortening
 $shortUrl = $longUrl;
