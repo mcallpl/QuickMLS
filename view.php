@@ -279,7 +279,7 @@ $v = time();
 <script>
 // Client mode — data is pre-loaded server-side, no API call needed
 var CLIENT_MODE = true;
-var PRELOADED_DATA = <?= json_encode($searchData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+var PRELOADED_DATA = <?= json_encode($searchData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 var GOOGLE_MAPS_KEY = <?= json_encode(GOOGLE_MAPS_API_KEY) ?>;
 
 document.addEventListener('DOMContentLoaded', function() {

@@ -153,6 +153,11 @@ function parseAddressString(string $addr): array {
     // ("123 Main St, Unit 5, Los Angeles, CA 90001") doesn't get mis-read as the
     // city ("Unit 5") / state ("LO").
     $segs = array_values(array_filter(array_map('trim', explode(',', $addr)), 'strlen'));
+    // Google autocomplete appends a country segment ("..., USA"); drop it so the
+    // last segment is the "ST ZIP" part, not "USA".
+    if ($segs && preg_match('/^(USA|United States|US)$/i', end($segs))) {
+        array_pop($segs);
+    }
     if (count($segs) >= 3) {
         $last = array_pop($segs);
         if (preg_match('/^([A-Za-z]{2})\b\s*(\d{5})?/', $last, $m)) {
