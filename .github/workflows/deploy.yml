@@ -29,6 +29,8 @@ jobs:
             *.md,
             .cpanel.yml,
             .env,
+            deploy.sh,
+            .aios_relay/,
             node_modules/,
             venv/,
             __pycache__/
