@@ -5,6 +5,13 @@
  * Creates the quickmls database, users table, shares table, and admin user.
  */
 
+// Refuse to run over the web. This script (re)creates the admin account and
+// would otherwise let any anonymous visitor reset the admin password and role.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('This setup script can only be run from the command line.');
+}
+
 require_once __DIR__ . '/config.php';
 
 // Connect without database (to create it)

@@ -3,19 +3,16 @@
  * Cache Statistics & Management API
  * Monitor and manage property data cache
  */
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../lib/session.php';
 require_once __DIR__ . '/../lib/cache.php';
 
 header('Content-Type: application/json');
 
-$action = $_GET['action'] ?? 'stats';
-$token = $_GET['token'] ?? '';
+// Admin-only: cache stats can be viewed and the cache cleared from here.
+requireAdmin();
 
-// Simple token check (use the same one from QuickMLS)
-if ($token !== 'chip2026') {
-    http_response_code(403);
-    echo json_encode(['error' => 'Access denied']);
-    exit;
-}
+$action = $_GET['action'] ?? 'stats';
 
 switch ($action) {
     case 'stats':
@@ -32,6 +29,12 @@ switch ($action) {
         break;
 
     case 'clear':
+        // Destructive: require POST so it can't be triggered via a GET link/img (CSRF).
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Use POST to clear the cache']);
+            break;
+        }
         PropertyDataCache::clear();
         echo json_encode([
             'status' => 'success',

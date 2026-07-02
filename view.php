@@ -88,7 +88,7 @@ if (!empty($share['snapshot_hero'])) {
                 if (!$subject || ($subject['ListingKey'] ?? '') !== $heroListingKey) {
                     try {
                         $heroResult = trestleGet('Property', [
-                            '$filter'  => "ListingKey eq '" . addslashes($heroListingKey) . "'",
+                            '$filter'  => "ListingKey eq '" . odataEscape($heroListingKey) . "'",
                             '$select'  => $selectFields,
                             '$top'     => 1,
                         ]);
@@ -197,8 +197,8 @@ $v = time();
         <div id="heroSection" class="hero-section">
             <div class="hero-carousel-wrap">
                 <div id="heroCarousel" class="hero-carousel"></div>
-                <button id="carouselLeft" class="carousel-arrow carousel-left">&#8249;</button>
-                <button id="carouselRight" class="carousel-arrow carousel-right">&#8250;</button>
+                <button id="carouselLeft" class="carousel-arrow carousel-left" aria-label="Previous photo">&#8249;</button>
+                <button id="carouselRight" class="carousel-arrow carousel-right" aria-label="Next photo">&#8250;</button>
                 <div id="carouselCounter" class="carousel-counter">1 / 1</div>
                 <div id="heroStatusBadge" class="hero-status-badge">Active</div>
             </div>

@@ -4,6 +4,18 @@
  */
 
 if (session_status() === PHP_SESSION_NONE) {
+    // Harden the session cookie. "secure" is set only when the request is
+    // actually over HTTPS so local http:// development still works.
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443)
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'httponly' => true,
+        'secure'   => $secure,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 

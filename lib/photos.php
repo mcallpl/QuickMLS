@@ -7,7 +7,7 @@ function batchGetAllPhotos(array $listingKeys): array {
     $chunks = array_chunk($listingKeys, 2);
 
     foreach ($chunks as $chunk) {
-        $orParts = array_map(fn($k) => "ResourceRecordKey eq '$k'", $chunk);
+        $orParts = array_map(fn($k) => "ResourceRecordKey eq '" . odataEscape((string)$k) . "'", $chunk);
         $filter  = '(' . implode(' or ', $orParts) . ')';
 
         for ($attempt = 0; $attempt < 2; $attempt++) {
@@ -16,7 +16,9 @@ function batchGetAllPhotos(array $listingKeys): array {
                     '$filter'  => $filter,
                     '$select'  => 'ResourceRecordKey,MediaURL,Order',
                     '$orderby' => 'ResourceRecordKey asc,Order asc',
-                    '$top'     => 200,
+                    // 2 listings per request; raise the cap so a listing with 100+
+                    // photos paired with another isn't truncated by a shared limit.
+                    '$top'     => 500,
                 ]);
                 foreach ($result['value'] ?? [] as $m) {
                     $key = $m['ResourceRecordKey'];
@@ -38,7 +40,7 @@ function batchGetAllPhotos(array $listingKeys): array {
 function getPhotosForListing(string $listingKey, int $limit = 100): array {
     try {
         $result = trestleGet('Media', [
-            '$filter'  => "ResourceRecordKey eq '$listingKey'",
+            '$filter'  => "ResourceRecordKey eq '" . odataEscape($listingKey) . "'",
             '$orderby' => 'Order',
             '$select'  => 'MediaURL,Order,ShortDescription',
             '$top'     => $limit,

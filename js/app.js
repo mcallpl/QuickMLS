@@ -9,6 +9,7 @@
 
     // ── Mode detection ──
     var clientMode = (typeof CLIENT_MODE !== 'undefined') && CLIENT_MODE;
+    var isAdmin    = (typeof IS_ADMIN !== 'undefined') && IS_ADMIN;
 
     // ── DOM refs ──
     var addressInput = document.getElementById('addressInput');
@@ -32,6 +33,8 @@
     }
     var radiusCircle  = null;   // Leaflet circle layer
     var radiusDebounce = null;  // debounce timer for re-fetch
+    var radiusListenersBound = false; // bind slider/tick listeners only once
+    var shouldScrollHero = false;     // scroll to hero only on a fresh search
     var allCompsData  = [];     // unfiltered comps (master list)
     var mapZoomOverride = null; // snapshot zoom for client view
 
@@ -68,10 +71,16 @@
         var radiusLabel  = document.getElementById('radiusLabel');
         if (!radiusSlider) return;
 
-        // Sync slider to current radius
+        // Sync slider to current radius (every call)
         radiusSlider.value = currentRadius;
         radiusLabel.textContent = formatRadius(currentRadius);
         highlightActiveTick(currentRadius);
+
+        // Bind the input/tick listeners only once. initRadiusSlider() runs inside
+        // renderAll() (every search, swap, and filter toggle), so without this guard
+        // the handlers stacked up and a single drag fired them N times.
+        if (radiusListenersBound) return;
+        radiusListenersBound = true;
 
         radiusSlider.addEventListener('input', function() {
             currentRadius = parseFloat(this.value);
@@ -92,7 +101,7 @@
             clearTimeout(radiusDebounce);
             radiusDebounce = setTimeout(function() {
                 if (appData && appData.address) {
-                    doSearch(appData.address, currentRadius);
+                    doSearch(appData.address, currentRadius, heroData ? heroData.ListingKey : null);
                 }
             }, 400);
         });
@@ -153,7 +162,7 @@
         });
     }
 
-    if (searchBtn) searchBtn.addEventListener('click', doSearch);
+    if (searchBtn) searchBtn.addEventListener('click', function() { doSearch(); });
     if (addressInput) {
         addressInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') setTimeout(doSearch, 150);
@@ -166,11 +175,20 @@
     if (carLeft) carLeft.addEventListener('click', function() { moveCarousel(-1); });
     if (carRight) carRight.addEventListener('click', function() { moveCarousel(1); });
 
-    function doSearch(overrideAddr, overrideRadius) {
+    function doSearch(overrideAddr, overrideRadius, preserveHeroKey) {
         var addr = overrideAddr || (addressInput ? addressInput.value.trim() : '');
         if (!addr) return;
 
         var radius = overrideRadius || currentRadius;
+
+        // Scroll to the hero only for a fresh user search — not for the radius
+        // slider's re-fetch (which passes overrideRadius), and not for swaps/filters
+        // (which call renderAll directly, never doSearch).
+        shouldScrollHero = (overrideRadius === undefined);
+
+        // Dismiss the Google Places autocomplete dropdown so it doesn't linger
+        // over the results after searching.
+        if (addressInput) addressInput.blur();
 
         showLoader();
         hideResults();
@@ -202,6 +220,18 @@
                     return;
                 }
 
+                // If the caller asked to keep a specific property as the hero — e.g.
+                // the user swapped a comp into the hero slot and then moved the radius
+                // slider — restore it instead of reverting to the searched subject.
+                if (preserveHeroKey && heroData && heroData.ListingKey !== preserveHeroKey) {
+                    var _all  = [heroData].concat(allCompsData);
+                    var _keep = _all.filter(function(c) { return c.ListingKey === preserveHeroKey; })[0];
+                    if (_keep) {
+                        heroData     = _keep;
+                        allCompsData = _all.filter(function(c) { return c.ListingKey !== preserveHeroKey; });
+                    }
+                }
+
                 buildCompFilters();
                 applyCompFilters();
                 renderAll();
@@ -215,6 +245,7 @@
     // Expose for client mode — load pre-fetched data directly (no API call)
     window.loadPreloadedData = function(data) {
         hideLoader();
+        shouldScrollHero = true; // fresh client-view render
         appData = data;
         currentRadius = data.radius_miles || currentRadius;
         if (data.map_zoom) mapZoomOverride = data.map_zoom;
@@ -253,6 +284,10 @@
     // ═══════════════════════════════════════════════════════════
 
     function renderHero(p) {
+        // Consume the one-shot scroll flag (set only for fresh searches).
+        var doScroll = shouldScrollHero;
+        shouldScrollHero = false;
+
         // ── Photo Carousel ──
         var photos = p._photos || [];
         var carousel = document.getElementById('heroCarousel');
@@ -285,7 +320,8 @@
         // ── Address + Price ──
         var street = [p.StreetNumber, p.StreetDirPrefix, p.StreetName, p.StreetSuffix, p.StreetDirSuffix].filter(Boolean).join(' ');
         var unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
-        document.getElementById('heroAddress').textContent = street + unit;
+        document.getElementById('heroAddress').textContent = (street + unit).trim()
+            || p.PropertySubType || p.PropertyType || 'Address not disclosed';
         document.getElementById('heroCityLine').textContent = [p.City, p.StateOrProvince, p.PostalCode, p.CountyOrParish ? p.CountyOrParish + ' County' : ''].filter(Boolean).join(', ');
 
         // ── Off-Market: hide blank fields, show contact panel ──
@@ -320,7 +356,7 @@
               + '<div class="omp-agent-line">Chip McAllister &middot; Broker Associate &middot; DRE #01971252 &middot; First Team Real Estate</div>'
               + '</div>';
 
-            document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (doScroll) document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
 
@@ -345,10 +381,12 @@
         setText('heroStories', p.StoriesTotal);
         setText('heroDom', p.DaysOnMarket);
 
-        // Lot
+        // Lot — coerce to a number first (the API/snapshot may send it as a string,
+        // and calling .toFixed on a string would throw and abort the whole render).
         var lotText = '—';
-        if (p.LotSizeAcres && p.LotSizeAcres > 0 && p.LotSizeAcres < 100) {
-            lotText = p.LotSizeAcres >= 1 ? p.LotSizeAcres.toFixed(2) + ' ac' : num(Math.round(p.LotSizeAcres * 43560)) + ' sf';
+        var acres = parseFloat(p.LotSizeAcres);
+        if (!isNaN(acres) && acres > 0 && acres < 100) {
+            lotText = acres >= 1 ? acres.toFixed(2) + ' ac' : num(Math.round(acres * 43560)) + ' sf';
         } else if (p.LotSizeSquareFeet) {
             lotText = num(p.LotSizeSquareFeet) + ' sf';
         }
@@ -438,7 +476,7 @@
         // ── Private Remarks (admin only, never in client mode) ──
         var privSection = document.getElementById('heroPrivateRemarks');
         if (privSection) {
-            if (p.PrivateRemarks && !clientMode) {
+            if (p.PrivateRemarks && !clientMode && isAdmin) {
                 document.getElementById('heroPrivateRemarksText').textContent = p.PrivateRemarks;
                 privSection.classList.remove('hidden');
             } else {
@@ -448,7 +486,7 @@
 
         // ── Showing Instructions + Meta ──
         var metaHtml = '';
-        if (!clientMode) {
+        if (!clientMode && isAdmin) {
             if (p.ShowingInstructions) {
                 metaHtml += '<div class="meta-row"><strong>Showing Instructions:</strong> ' + esc(p.ShowingInstructions) + '</div>';
             }
@@ -465,7 +503,7 @@
         document.getElementById('heroMeta').innerHTML = metaHtml;
 
         // Scroll to top of hero
-        document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (doScroll) document.getElementById('heroSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // ── Agent card HTML builder ──
@@ -523,6 +561,13 @@
             var card = document.createElement('div');
             card.className = 'comp-card';
             card.dataset.compIdx = idx;
+            // Keyboard / screen-reader operability (cards act as buttons).
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('aria-label', 'View full details for ' + formatAddr(c));
+            card.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+            });
 
             var html = '';
             if (photo) {
@@ -533,7 +578,7 @@
 
             html += '<div class="comp-card-body">';
             html += '<div class="comp-card-status ' + statusClass(status) + '">' + formatStatus(status) + '</div>';
-            html += '<div class="comp-card-price">$' + (price ? num(price) : '—') + '</div>';
+            html += '<div class="comp-card-price">' + (price ? '$' + num(price) : '—') + '</div>';
             html += '<div class="comp-card-addr">' + esc(formatAddr(c)) + '</div>';
 
             html += '<div class="comp-card-stats">';
@@ -590,11 +635,20 @@
     // ── Map ──
     function renderMap(geo, subject, comps) {
         var mapEl = document.getElementById('map');
+        // Guard against a missing/zero center (e.g. a snapshot that lost its
+        // coordinates) — better to hide the map than to drop the user in the ocean.
+        var cLat = geo ? parseFloat(geo.lat) : NaN;
+        var cLng = geo ? parseFloat(geo.lng) : NaN;
+        if (!mapEl || isNaN(cLat) || isNaN(cLng) || (cLat === 0 && cLng === 0)) {
+            if (mapEl) mapEl.style.display = 'none';
+            return;
+        }
+        mapEl.style.display = '';
         if (map) { map.remove(); map = null; }
         markers = [];
 
         var zoom = (mapZoomOverride !== null) ? mapZoomOverride : getZoomForRadius(currentRadius);
-        map = L.map(mapEl).setView([geo.lat, geo.lng], zoom);
+        map = L.map(mapEl).setView([cLat, cLng], zoom);
 
         var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
         var tileUrl = isDark
@@ -620,7 +674,7 @@
             });
             var sm = L.marker([subject.Latitude, subject.Longitude], { icon: si }).addTo(map);
             var sp = subject.ClosePrice || subject.ListPrice;
-            sm.bindPopup('<b>CURRENT PROPERTY</b><br><div class="popup-price">$' + (sp ? num(sp) : '—') + '</div><div class="popup-addr">' + esc(formatAddr(subject)) + '</div>');
+            sm.bindPopup('<b>CURRENT PROPERTY</b><br><div class="popup-price">' + (sp ? '$' + num(sp) : '—') + '</div><div class="popup-addr">' + esc(formatAddr(subject)) + '</div>');
         }
 
         // Comp markers
@@ -635,7 +689,7 @@
             });
             var m = L.marker([c.Latitude, c.Longitude], { icon: icon }).addTo(map);
             var cp = c.ClosePrice || c.ListPrice;
-            var popup = '<div class="popup-price">$' + (cp ? num(cp) : '—') + '</div>';
+            var popup = '<div class="popup-price">' + (cp ? '$' + num(cp) : '—') + '</div>';
             popup += '<div class="popup-addr">' + esc(formatAddr(c)) + '</div>';
             popup += '<div style="margin-top:4px;font-size:12px;">' + (c.BedroomsTotal||'—') + ' bd | ' + (c.BathroomsTotalInteger||'—') + ' ba | ' + (c.LivingArea ? num(c.LivingArea) + ' sqft' : '—') + '</div>';
             if (!clientMode && c.ListAgentFullName) popup += '<div style="font-size:11px;color:#58a6ff;margin-top:2px;">' + esc(c.ListAgentFullName) + '</div>';
@@ -744,20 +798,37 @@
         // Copy message
         document.getElementById('copyLinkBtn').addEventListener('click', function() {
             var text = document.getElementById('sendMessageText').value || generatedMessage;
-            navigator.clipboard.writeText(text).then(function() {
-                var btn = document.getElementById('copyLinkBtn');
-                btn.textContent = 'Copied!';
+            var btn  = document.getElementById('copyLinkBtn');
+            function done(label) {
+                btn.textContent = label;
                 setTimeout(function() { btn.innerHTML = '&#128203; Copy Message'; }, 2000);
-            });
+            }
+            function fallbackCopy() {
+                // Non-secure context (http / IP) has no navigator.clipboard — select
+                // the textarea and use execCommand, or tell the user to copy manually.
+                var ta = document.getElementById('sendMessageText');
+                ta.focus(); ta.select();
+                try {
+                    done(document.execCommand('copy') ? 'Copied!' : 'Press Ctrl/Cmd+C');
+                } catch (e) {
+                    done('Press Ctrl/Cmd+C');
+                }
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() { done('Copied!'); }).catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
         });
 
         // Native share (mobile) — shares full message
         document.getElementById('shareLinkBtn').addEventListener('click', function() {
             if (navigator.share) {
                 var text = document.getElementById('sendMessageText').value || generatedMessage;
-                navigator.share({
-                    text: text,
-                });
+                var payload = { text: text };
+                if (generatedShareUrl) payload.url = generatedShareUrl;
+                // Swallow the rejection thrown when the user cancels the share sheet.
+                navigator.share(payload).catch(function() {});
             }
         });
     }
@@ -804,14 +875,16 @@
         html += '<span class="comp-filters-label">Show:</span>';
 
         types.forEach(function(t) {
-            var on = (activeTypes != null) ? (activeTypes.indexOf(t) !== -1) : (t === heroType);
+            // Default: match the hero's type; but if the hero has no type (off-market
+            // subject), pre-check everything so the filter row doesn't look empty.
+            var on = (activeTypes != null) ? (activeTypes.indexOf(t) !== -1) : (heroType ? (t === heroType) : true);
             html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="type" value="' + escAttr(t) + '"' + (on ? ' checked' : '') + '><span>' + esc(formatFilterLabel(t)) + '</span></label>';
         });
 
         if (types.length > 0 && subTypes.length > 0) html += '<span class="comp-filters-sep">|</span>';
 
         subTypes.forEach(function(st) {
-            var on = (activeSubs != null) ? (activeSubs.indexOf(st) !== -1) : (st === heroSubType);
+            var on = (activeSubs != null) ? (activeSubs.indexOf(st) !== -1) : (heroSubType ? (st === heroSubType) : true);
             html += '<label class="comp-filter-cb"><input type="checkbox" data-filter-type="subtype" value="' + escAttr(st) + '"' + (on ? ' checked' : '') + '><span>' + esc(formatFilterLabel(st)) + '</span></label>';
         });
 
@@ -884,7 +957,13 @@
     function formatAddr(p) {
         var street = [p.StreetNumber, p.StreetName].filter(Boolean).join(' ');
         var unit = p.UnitNumber ? ' #' + p.UnitNumber : '';
-        return street + unit + ', ' + [p.City, p.StateOrProvince].filter(Boolean).join(', ');
+        var cityState = [p.City, p.StateOrProvince].filter(Boolean).join(', ');
+        if (!street) {
+            // Some listings (e.g. Business Opportunity) have no street address.
+            var label = p.PropertySubType || p.PropertyType || 'Address not disclosed';
+            return cityState ? label + ' — ' + cityState : label;
+        }
+        return street + unit + (cityState ? ', ' + cityState : '');
     }
 
     function arr(val) {

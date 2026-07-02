@@ -37,6 +37,9 @@ if (!$user || !password_verify($password, $user['password_hash'])) {
     exit;
 }
 
+// Prevent session fixation: issue a fresh session ID now that the user is authenticated.
+session_regenerate_id(true);
+
 $_SESSION['user_id']  = $user['id'];
 $_SESSION['username'] = $user['username'];
 $_SESSION['role']     = $user['role'];

@@ -128,8 +128,8 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             <!-- Photo Carousel -->
             <div class="hero-carousel-wrap">
                 <div id="heroCarousel" class="hero-carousel"></div>
-                <button id="carouselLeft" class="carousel-arrow carousel-left">&#8249;</button>
-                <button id="carouselRight" class="carousel-arrow carousel-right">&#8250;</button>
+                <button id="carouselLeft" class="carousel-arrow carousel-left" aria-label="Previous photo">&#8249;</button>
+                <button id="carouselRight" class="carousel-arrow carousel-right" aria-label="Next photo">&#8250;</button>
                 <div id="carouselCounter" class="carousel-counter">1 / 1</div>
                 <div id="heroStatusBadge" class="hero-status-badge">Active</div>
             </div>

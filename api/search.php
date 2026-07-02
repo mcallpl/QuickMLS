@@ -7,9 +7,19 @@ ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 set_error_handler(function($severity, $message, $file, $line) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'error' => "PHP Error: $message"]);
-    exit;
+    // Respect the @-operator / current error_reporting level.
+    if (!(error_reporting() & $severity)) return false;
+    // Only fatal-class problems should abort the request with a JSON error.
+    // Warnings/notices/deprecations are logged and suppressed so a single odd
+    // MLS record can't take down the entire search.
+    if ($severity === E_USER_ERROR || $severity === E_RECOVERABLE_ERROR) {
+        error_log("QuickMLS search fatal: $message in $file:$line");
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'A server error occurred. Please try again.']);
+        exit;
+    }
+    error_log("QuickMLS search notice/warning: $message in $file:$line");
+    return true; // handled — do not fall through to PHP's default handler
 });
 
 header('Content-Type: application/json');
@@ -101,9 +111,6 @@ try {
     // 3. Find the subject property — exact address match in MLS
     $subject = findSubjectProperty($addrParts, $geo, $selectFields);
 
-    // Debug: log what was found
-    error_log("DEBUG: findSubjectProperty returned: " . ($subject ? "Property #" . ($subject['ListingKey'] ?? 'no-key') . " at " . ($subject['StreetNumber'] ?? '') . " " . ($subject['StreetName'] ?? '') : "null"));
-
     // 3b. Not in MLS — build a synthetic subject from the geocoded address
     //     so the searched property is always the hero, not a nearby active listing.
     if (!$subject) {
@@ -184,11 +191,6 @@ try {
         'compCount'    => count($comps),
         'address'      => $fullAddress,
         'radius_miles' => $radiusMiles,
-        '_debug'       => [
-            'subject_found' => $subject ? true : false,
-            'subject_street' => $subject ? ($subject['StreetNumber'] . ' ' . $subject['StreetName']) : null,
-            'subject_in_mls' => $subject ? !($subject['_not_in_mls'] ?? false) : false,
-        ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Exception $e) {

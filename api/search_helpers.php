@@ -8,7 +8,7 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
     $filters = [];
 
     if ($addrParts['number']) {
-        $filters[] = "StreetNumber eq '" . addslashes($addrParts['number']) . "'";
+        $filters[] = "StreetNumber eq '" . odataEscape($addrParts['number']) . "'";
     }
     if ($addrParts['street']) {
         // Use all significant words from the street name for a tighter match
@@ -18,14 +18,14 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
             // Skip common suffixes — they may not be in StreetName (they're in StreetSuffix)
             if (in_array(strtolower($word), ['st','ave','blvd','dr','rd','ln','ct','cir','pl','way','pkwy','ter','trl'])) continue;
             if (strlen($word) >= 2) {
-                $filters[] = "contains(StreetName, '" . addslashes($word) . "')";
+                $filters[] = "contains(StreetName, '" . odataEscape($word) . "')";
             }
         }
     }
     if ($addrParts['city']) {
-        $filters[] = "City eq '" . addslashes($addrParts['city']) . "'";
+        $filters[] = "City eq '" . odataEscape($addrParts['city']) . "'";
     } elseif (!empty($geo['city'])) {
-        $filters[] = "City eq '" . addslashes($geo['city']) . "'";
+        $filters[] = "City eq '" . odataEscape($geo['city']) . "'";
     }
 
     if (empty($filters)) return null;
@@ -43,12 +43,13 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
 
         $geolat = (float)($geo['lat'] ?? 0);
         $geolng = (float)($geo['lng'] ?? 0);
-        $maxDistance = 0.009;
-
-        error_log("DEBUG: Found " . count($props) . " properties from MLS query");
-        foreach ($props as $i => $p) {
-            error_log("DEBUG: Property $i: " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . " at " . ($p['Latitude'] ?? 'no-lat') . ", " . ($p['Longitude'] ?? 'no-lng'));
-        }
+        // Geocoders (Nominatim) often land on the parcel edge or street centroid,
+        // 100+ ft from the MLS-recorded coordinate. When we already have an exact
+        // street-number + street-name match, that match identifies the property, so
+        // allow a generous distance. The closest-only fallback (no exact match) uses
+        // a tighter gate to avoid grabbing a neighbor.
+        $exactMatchMaxDist = 0.06; // ~315 ft — tolerate geocoder disagreement on a confirmed match
+        $fallbackMaxDist   = 0.02; // ~105 ft — no name match, so require real proximity
 
         // Try to find exact street number match first
         if ($addrParts['number']) {
@@ -63,43 +64,34 @@ function findSubjectProperty(array $addrParts, array $geo, string $selectFields)
                         if (strlen($w) >= 2 && strpos($sn, $w) === false) { $match = false; break; }
                     }
                     if ($match) {
-                        // Verify coordinates are close to geocoded address (within ~50 feet)
+                        // Coordinates missing entirely? Trust the number+name match.
                         $pLat = (float)($p['Latitude'] ?? 0);
                         $pLng = (float)($p['Longitude'] ?? 0);
-                        if ($pLat && $pLng && $geolat && $geolng) {
-                            $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
-                            error_log("DEBUG: Distance to " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . ": " . number_format($dist, 6) . " miles (max: " . $maxDistance . ")");
-                            if ($dist <= $maxDistance) {
-                                error_log("DEBUG: MATCH FOUND: " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? ''));
-                                return $p;
-                            }
+                        if (!$pLat || !$pLng || !$geolat || !$geolng) {
+                            return $p;
+                        }
+                        $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
+                        if ($dist <= $exactMatchMaxDist) {
+                            return $p;
                         }
                     }
                 }
             }
         }
 
-        // Fallback: find closest property within max distance
+        // Fallback: find closest property within the tighter max distance
         $closest = null;
-        $closestDist = $maxDistance;
-        error_log("DEBUG: Fallback to closest property within " . $maxDistance . " miles");
+        $closestDist = $fallbackMaxDist;
         foreach ($props as $p) {
             $pLat = (float)($p['Latitude'] ?? 0);
             $pLng = (float)($p['Longitude'] ?? 0);
             if ($pLat && $pLng && $geolat && $geolng) {
                 $dist = haversineDistance($geolat, $geolng, $pLat, $pLng);
-                error_log("DEBUG: Closest check - " . ($p['StreetNumber'] ?? '') . " " . ($p['StreetName'] ?? '') . ": " . number_format($dist, 6) . " miles");
                 if ($dist <= $closestDist) {
                     $closest = $p;
                     $closestDist = $dist;
                 }
             }
-        }
-
-        if ($closest) {
-            error_log("DEBUG: Returning closest property: " . ($closest['StreetNumber'] ?? '') . " " . ($closest['StreetName'] ?? '') . " at " . number_format($closestDist, 6) . " miles");
-        } else {
-            error_log("DEBUG: No property found within max distance");
         }
 
         return $closest;
@@ -126,15 +118,18 @@ function getComps(array $geo, float $radiusMiles, string $selectFields, ?string 
     ];
 
     if ($propertyType) {
-        $filters[] = "PropertyType eq '" . addslashes($propertyType) . "'";
+        $filters[] = "PropertyType eq '" . odataEscape($propertyType) . "'";
     }
 
     try {
+        // Fetch up to 200 (OData can't order by computed distance, so we pull a
+        // large slice of the bounding box and distance-filter/sort client-side).
+        // The old $top=50 ordered by ModificationTimestamp dropped the *closest*
+        // comps in dense blocks in favor of the most-recently-touched ones.
         $result = trestleGet('Property', [
             '$filter'  => implode(' and ', $filters),
             '$select'  => $selectFields,
-            '$top'     => 50,
-            '$orderby' => 'ModificationTimestamp desc',
+            '$top'     => 200,
         ]);
 
         $properties = $result['value'] ?? [];
@@ -153,20 +148,50 @@ function getComps(array $geo, float $radiusMiles, string $selectFields, ?string 
 function parseAddressString(string $addr): array {
     $parts = ['number'=>'','street'=>'','city'=>'','state'=>'','zip'=>''];
 
-    // Try full address format: 123 Street Name, City, State ZIP
-    if (preg_match('/^(\d+)\s+(.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?/i', $addr, $m)) {
+    // Comma-aware parse: pull state/zip from the last segment and the city from
+    // the segment before it, so an intermediate unit line
+    // ("123 Main St, Unit 5, Los Angeles, CA 90001") doesn't get mis-read as the
+    // city ("Unit 5") / state ("LO").
+    $segs = array_values(array_filter(array_map('trim', explode(',', $addr)), 'strlen'));
+    if (count($segs) >= 3) {
+        $last = array_pop($segs);
+        if (preg_match('/^([A-Za-z]{2})\b\s*(\d{5})?/', $last, $m)) {
+            $parts['state'] = strtoupper($m[1]);
+            $parts['zip']   = $m[2] ?? '';
+            $parts['city']  = array_pop($segs) ?? '';
+        } else {
+            // Last segment wasn't "ST ZIP"; treat it as the city.
+            $parts['city'] = $last;
+        }
+        // Remaining segments are street + any unit line. Drop unit designators so
+        // they don't leak into the StreetName filter.
+        $streetSegs = [];
+        foreach ($segs as $s) {
+            if (preg_match('/^\s*(unit|apt|apartment|ste|suite|no\.?|#)\b/i', $s)) continue;
+            $streetSegs[] = $s;
+        }
+        $streetFull = trim(implode(' ', $streetSegs));
+        if (preg_match('/^(\d+)\s+(.+)$/', $streetFull, $m2)) {
+            $parts['number'] = $m2[1];
+            $parts['street'] = trim($m2[2]);
+        } else {
+            $parts['street'] = $streetFull;
+        }
+    } elseif (preg_match('/^(\d+)\s+(.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?/i', $addr, $m)) {
+        // "123 Street Name, City, State ZIP" with no unit line
         $parts['number'] = $m[1];
         $parts['street'] = trim($m[2]);
         $parts['city']   = trim($m[3]);
         $parts['state']  = strtoupper($m[4]);
         $parts['zip']    = $m[5] ?? '';
-    } else {
-        // Fallback: try just street address without city/state: 123 Street Name
-        if (preg_match('/^(\d+)\s+(.+)$/', $addr, $m)) {
-            $parts['number'] = $m[1];
-            $parts['street'] = trim($m[2]);
-        }
+    } elseif (preg_match('/^(\d+)\s+(.+)$/', $addr, $m)) {
+        // Bare "123 Street Name"
+        $parts['number'] = $m[1];
+        $parts['street'] = trim($m[2]);
     }
+
+    // Strip a trailing inline unit ("Main St #5" -> "Main St").
+    $parts['street'] = trim(preg_replace('/\s*#\s*\S+\s*$/', '', $parts['street']));
 
     return $parts;
 }

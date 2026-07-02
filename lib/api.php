@@ -1,6 +1,16 @@
 <?php
 require_once __DIR__ . '/cache.php';
 
+/**
+ * Escape a value for use inside an OData string literal.
+ * OData escapes a single quote by doubling it ('') — NOT with a backslash.
+ * Using addslashes() here breaks any input containing an apostrophe
+ * (e.g. "O'Brien") and is an injection vector.
+ */
+function odataEscape(string $value): string {
+    return str_replace("'", "''", $value);
+}
+
 function trestleGet(string $endpoint, array $params = []): array {
     // Check cache first
     $cached = PropertyDataCache::get('trestle', ['endpoint' => $endpoint, 'params' => $params]);
@@ -37,7 +47,11 @@ function trestleGet(string $endpoint, array $params = []): array {
         @unlink(TOKEN_CACHE_FILE);
         throw new Exception("Authorization expired. Please try again.");
     }
-    if ($httpCode !== 200) throw new Exception("MLS API error (HTTP $httpCode): $response");
+    if ($httpCode !== 200) {
+        // Log the raw upstream body for debugging, but don't leak it to the client.
+        error_log("Trestle API error (HTTP $httpCode) on $endpoint: " . substr((string)$response, 0, 500));
+        throw new Exception("MLS service error (HTTP $httpCode). Please try again.");
+    }
 
     $result = json_decode($response, true) ?: [];
 

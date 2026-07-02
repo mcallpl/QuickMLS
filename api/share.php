@@ -38,9 +38,9 @@ if (!json_decode($snapshotHero))                   $snapshotHero   = null;
 
 // Strip MLS agent/contact fields — clients must never see other agents' info
 $_agentFields = [
-    'ListAgentFullName','ListAgentDirectPhone','ListAgentEmail','ListAgentKey',
+    'ListAgentFullName','ListAgentDirectPhone','ListAgentEmail','ListAgentKey','ListAgentMlsId',
     'ListOfficeName','ListOfficePhone','ListOfficeKey',
-    'BuyerAgentFullName','BuyerAgentDirectPhone','BuyerAgentEmail','BuyerAgentKey',
+    'BuyerAgentFullName','BuyerAgentDirectPhone','BuyerAgentEmail','BuyerAgentKey','BuyerAgentMlsId',
     'BuyerOfficeName','BuyerOfficePhone','BuyerOfficeKey',
     'CoListAgentFullName','CoListAgentDirectPhone','CoListAgentEmail','CoListAgentKey',
     'ShowingContactName','ShowingContactPhone','ShowingContactType',
@@ -75,12 +75,14 @@ $db   = getDb();
 
 $stmt = $db->prepare("INSERT INTO shares (token, address, hero_listing_key, radius_miles, filter_types, filter_subtypes, created_by, snapshot_hero, snapshot_comps, map_zoom, map_lat, map_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 if (!$stmt) {
-    echo json_encode(['success' => false, 'error' => 'Database error: ' . $db->error]);
+    error_log('QuickMLS share prepare failed: ' . $db->error);
+    echo json_encode(['success' => false, 'error' => 'Could not create the share link. Please try again.']);
     exit;
 }
 $stmt->bind_param('sssdssissidd', $token, $address, $heroListingKey, $radiusMiles, $filterTypes, $filterSubTypes, $_SESSION['user_id'], $snapshotHero, $snapshotComps, $mapZoom, $mapLat, $mapLng);
 if (!$stmt->execute()) {
-    echo json_encode(['success' => false, 'error' => 'Failed to save share: ' . $stmt->error]);
+    error_log('QuickMLS share insert failed: ' . $stmt->error);
+    echo json_encode(['success' => false, 'error' => 'Could not save the share link. Please try again.']);
     exit;
 }
 $stmt->close();
