@@ -17,7 +17,24 @@ $v = time();
     <link rel="stylesheet" href="css/style.css?v=<?=$v?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
+    <!-- premium link + icon assets -->
+    <link rel="icon" href="/public/favicon.ico" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/favicon-16.png">
+    <link rel="apple-touch-icon" href="/public/apple-touch-icon.png">
+    <meta name="theme-color" content="#8A5410">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="QuickMLS">
+    <meta property="og:description" content="Instant property intelligence, the moment you ask.">
+    <meta property="og:image" content="/public/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="QuickMLS">
+    <meta name="twitter:description" content="Instant property intelligence, the moment you ask.">
+    <meta name="twitter:image" content="/public/og-image.png">
+    </head>
 <body>
 
 <?php if (!$loggedIn): ?>
