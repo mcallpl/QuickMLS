@@ -1,0 +1,4 @@
+# allow the endpoint php files, but never serve the public key or config source
+<FilesMatch "\.(pem|template)$">
+  Require all denied
+</FilesMatch>
