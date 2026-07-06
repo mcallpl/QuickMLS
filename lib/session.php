@@ -9,8 +9,15 @@ if (session_status() === PHP_SESSION_NONE) {
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['SERVER_PORT'] ?? '') == 443)
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    // Persistent sessions: dedicated dir so the distro GC cron cannot purge
+    // them; cookie + server-side lifetime one year.
+    $appSessDir = '/var/lib/php/app-sessions/quickmls';
+    if (is_dir($appSessDir) && is_writable($appSessDir)) {
+        ini_set('session.save_path', $appSessDir);
+        ini_set('session.gc_maxlifetime', '31536000');
+    }
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 31536000,
         'path'     => '/',
         'httponly' => true,
         'secure'   => $secure,
